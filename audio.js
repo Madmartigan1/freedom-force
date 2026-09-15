@@ -93,6 +93,16 @@ const Sound = {
                       N({ dur: 0.3, gain: 0.14, from: 900, to: 90 }); break;
       case 'warn':    [0, 1, 2, 3].forEach(i =>
                         this.tone(ctx, dest, t + i * 0.16, { freq: i % 2 ? 330 : 494, dur: 0.13, gain: 0.24, type: 'square' })); break;
+      // discovery jingle — bright ascending run, the classic "you found something"
+      case 'secret':  [0, 7, 12, 16, 19, 24].forEach((s, i) =>
+                        this.tone(ctx, dest, t + i * 0.085, { freq: 392 * Math.pow(2, s / 12), dur: 0.2, gain: 0.20, type: 'square' })); break;
+      case 'break':   this.noise(ctx, dest, t, { dur: 0.3, gain: 0.32, from: 5000, to: 300, q: 1.6 });
+                      this.tone(ctx, dest, t, { freq: 260, to: 70, dur: 0.22, gain: 0.16, type: 'square' }); break;
+      case 'key':     [0, 5, 12].forEach((s, i) =>
+                        this.tone(ctx, dest, t + i * 0.09, { freq: 587.33 * Math.pow(2, s / 12), dur: 0.22, gain: 0.20, type: 'triangle' })); break;
+      case 'unlock':  [0, 4, 7, 12].forEach((s, i) =>
+                        this.tone(ctx, dest, t + i * 0.1, { freq: 440 * Math.pow(2, s / 12), dur: 0.26, gain: 0.22, type: 'square' }));
+                      this.noise(ctx, dest, t, { dur: 0.18, gain: 0.14, from: 3000, to: 400 }); break;
       case 'clear':   [0, 4, 7, 12, 16, 19].forEach((s, i) =>
                         this.tone(ctx, dest, t + i * 0.1, { freq: 261.6 * Math.pow(2, s / 12), dur: 0.26, gain: 0.22, type: 'square' })); break;
       case 'gameover':[0, -2, -4, -7].forEach((s, i) =>

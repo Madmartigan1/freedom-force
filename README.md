@@ -48,6 +48,20 @@ Barrel distortion is deliberately gentle (`k = 0.030`). Stronger curvature pushe
 the HUD at `(8, 6)` off the edge of the tube — at `0.055` roughly two-thirds of
 the score line's lit pixels are lost.
 
+## Health and secrets
+
+Hearts replace the old three-lives model: a hit chips one heart rather than
+ending a life outright.
+
+- **Heart containers** permanently raise your maximum (up to 8) and **carry
+  across stages**, so searching early makes the later stages survivable.
+- **Heart refills** top you back up.
+- **Cracked blocks** are scattered through every stage. They read as scenery —
+  the hairline crack is the only tell. Shoot one three times and it shatters,
+  revealing a container, a refill or a weapon pod. A few sit on ledges you can
+  only reach from one specific platform.
+- The stage-clear screen tallies how many you found.
+
 ## Weapons
 
 Three pods are scattered through each stage. Run into one to swap weapon; you

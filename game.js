@@ -13,6 +13,13 @@ const SLIDE_SPEED = 260, SLIDE_TIME = 420, SLIDE_CD = 260;  // ms
 const KICK_CD = 360, KICK_RANGE = 24;
 const CHARGE_TIME = 600;               // ms held for a full charge shot
 
+// ---------- health ----------
+// Hearts replace the old three-lives model: a hit chips one heart instead of
+// ending a life outright. Heart containers permanently raise the maximum and
+// carry from stage to stage, so exploring early pays off later.
+const HEARTS_START = 3;
+const HEARTS_MAX = 8;
+
 // ---------- weapons ----------
 // Picked up mid-stage and held until the stage ends. Anything other than the
 // default rifle overrides Stage 2's charge shot: a power-up should feel like a
@@ -45,6 +52,9 @@ const LEVELS = [
     boss: { key: 'obama', name: 'BARACK O.', hp: 10 },
     carriage: 900,
     pickups: [[620, 200, 'machine'], [1480, 130, 'spread'], [2380, 132, 'laser']],
+    // secret: [x, y, reward] — a cracked block hiding something
+    secrets: [[1150, 214, 'heartc'], [1960, 214, 'heart'], [2740, 130, 'laser']],
+    ledges: [[1930, 160, 70], [2710, 158, 64]],
   },
   {
     theme: 'neon', enhanced: true,
@@ -55,6 +65,8 @@ const LEVELS = [
     boss: { key: 'robo', name: 'OMEGA AGENT', hp: 16 },
     carriage: 760,
     pickups: [[520, 200, 'spread'], [1260, 130, 'laser'], [2180, 126, 'machine']],
+    secrets: [[880, 214, 'heartc'], [1720, 214, 'heart'], [2560, 128, 'spread']],
+    ledges: [[2530, 158, 70]],
   },
   {
     theme: 'marble', enhanced: true,
@@ -66,6 +78,8 @@ const LEVELS = [
     boss: { key: 'idol', name: 'THE GOLDEN IDOL', hp: 22 },
     carriage: 620,
     pickups: [[430, 200, 'laser'], [1200, 126, 'machine'], [2360, 170, 'spread'], [2880, 166, 'laser']],
+    secrets: [[760, 214, 'heartc'], [1640, 214, 'heart'], [2240, 214, 'heart'], [3000, 126, 'machine']],
+    ledges: [[2970, 156, 70]],
   },
 ];
 
@@ -219,6 +233,56 @@ const GLYPH = {
   S: ['111','100','111','001','111'],
   L: ['100','100','100','100','111'],
 };
+// ---------- breakable walls ----------
+// Subtly cracked blocks. They read as scenery until you shoot one; the crack is
+// the only tell, which is the whole point of a secret.
+function makeCrackedBlock(scene, key, base, edge, crack) {
+  const S = 22;
+  const tex = scene.textures.createCanvas(key, S, S);
+  const c = tex.context;
+  const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  R(0, 0, S, S, base);
+  R(0, 0, S, 2, edge);
+  R(0, 0, 2, S, edge);
+  R(S - 2, 2, 2, S - 2, '#00000055');
+  R(2, S - 2, S - 2, 2, '#00000055');
+  // masonry joints
+  R(0, 10, S, 1, '#00000044');
+  R(11, 0, 1, 10, '#00000044');
+  R(6, 11, 1, 11, '#00000044');
+  // the crack
+  R(7, 3, 1, 5, crack); R(8, 6, 1, 4, crack); R(9, 9, 1, 5, crack);
+  R(8, 13, 1, 4, crack); R(10, 15, 1, 5, crack); R(12, 7, 1, 3, crack);
+  tex.refresh();
+}
+
+// ---------- hearts ----------
+const HEART_PX = [
+  '.11.11.',
+  '1111111',
+  '1111111',
+  '.11111.',
+  '..111..',
+  '...1...',
+];
+function makeHeart(scene, key, fill, edge, scale) {
+  const s = scale || 2;
+  const W = 7 * s + 2, H = 6 * s + 2;
+  const tex = scene.textures.createCanvas(key, W, H);
+  const c = tex.context;
+  HEART_PX.forEach((row, y) => row.split('').forEach((on, x) => {
+    if (on !== '1') return;
+    c.fillStyle = edge; c.fillRect(x * s, y * s, s + 2, s + 2);
+  }));
+  HEART_PX.forEach((row, y) => row.split('').forEach((on, x) => {
+    if (on !== '1') return;
+    c.fillStyle = fill; c.fillRect(x * s + 1, y * s + 1, s, s);
+  }));
+  // specular dot, top-left lobe
+  c.fillStyle = '#ffffff'; c.fillRect(1 + s, 1 + s, Math.max(1, s - 1), Math.max(1, s - 1));
+  tex.refresh();
+}
+
 function makePod(scene, key, letter, colorHex) {
   // Integer-aligned throughout: fractional fillRect coords smear the glyph rows
   // together. Bright letter on a dark core — the reverse had far too little
@@ -280,6 +344,15 @@ class BootScene extends Phaser.Scene {
     const idol = { w: 46, h: 62, skin: '#d9a521', hair: '#ffe27a', hairStyle: 'swoop', suit: '#8c6a14', tie: '#d21f1f', pants: '#6b500f', eye: '#ffffff' };
     makeChar(this, 'idol0', { ...idol, frame: 0 });
     makeChar(this, 'idol1', { ...idol, frame: 1 });
+
+    // breakable blocks, one per theme
+    makeCrackedBlock(this, 'brk_city',   '#4a3f52', '#6d6080', '#241c2b');
+    makeCrackedBlock(this, 'brk_neon',   '#241a3a', '#4a2f6e', '#0d0718');
+    makeCrackedBlock(this, 'brk_marble', '#6d6480', '#b9b0cc', '#332e40');
+
+    // hearts: small refill, large permanent container
+    makeHeart(this, 'heart',  '#ff3b6a', '#5c0a1e', 2);
+    makeHeart(this, 'heartc', '#ffd23a', '#7a4a00', 3);
 
     // weapon pods
     makePod(this, 'pod_machine', 'M', '#ff9e18');
@@ -364,6 +437,7 @@ class GameScene extends Phaser.Scene {
   init(data) {
     this.level = (data && data.level) ? data.level : 1;
     this.startScore = (data && data.score) ? data.score : 0;
+    this.maxHearts = (data && data.maxHearts) ? data.maxHearts : HEARTS_START;
   }
 
   create() {
@@ -371,7 +445,7 @@ class GameScene extends Phaser.Scene {
     this.enhanced = this.levelData.enhanced;
 
     this.gameOverFlag = false; this.won = false;
-    this.score = this.startScore; this.lives = 3;
+    this.score = this.startScore; this.hearts = this.maxHearts;
     this.facing = 1; this.nextShot = 0; this.invulnUntil = 0;
     this.jumping = false;
     this.sliding = false; this.slideUntil = 0; this.slideCdUntil = 0;
@@ -441,6 +515,37 @@ class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: pod, y: y - 7, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     });
     this.physics.add.overlap(this.player, this.pods, (pl, pod) => this.takePod(pod));
+
+    // hearts and containers share one group
+    this.items = this.physics.add.group({ allowGravity: false });
+    this.physics.add.overlap(this.player, this.items, (pl, it) => this.takeItem(it));
+
+    // ---- secret ledges: the only way to reach some hidden blocks ----
+    (this.levelData.ledges || []).forEach(([lx, ly, lw]) => {
+      this.addSolid(lx, ly, lw, 12, neon ? 0x241a3a : 0x3a4152, neon ? 0x27e0e0 : 0x5a6478);
+      this.add.rectangle(lx, ly - 5, lw - 2, 2, neon ? 0x5affff : 0x8794a8).setDepth(1);
+    });
+
+    // ---- secrets: cracked blocks that break to reveal a reward ----
+    const brkKey = 'brk_' + (this.levelData.theme === 'neon' ? 'neon' : this.levelData.theme === 'marble' ? 'marble' : 'city');
+    this.breakables = this.physics.add.staticGroup();
+    (this.levelData.secrets || []).forEach(([sx, sy, reward]) => {
+      const b = this.breakables.create(sx, sy, brkKey);
+      b.reward = reward;
+      b.hp = 3;
+      b.setDepth(3);
+      b.refreshBody();
+    });
+    this.secretsFound = 0;
+    this.secretsTotal = (this.levelData.secrets || []).length;
+    this.physics.add.collider(this.player, this.breakables);
+    this.physics.add.collider(this.enemies, this.breakables);
+    this.physics.add.overlap(this.pbullets, this.breakables, (a, b) => {
+      // Group order varies; the bullet is whichever one is not in the static group.
+      const blk = this.breakables.contains(a) ? a : b;
+      const bul = blk === a ? b : a;
+      this.hitBreakable(bul, blk);
+    });
 
     // ---- THE BEAST ----
     this.mountHint = this.add.text(0, 0, '\u25b2 UP TO RIDE', { fontFamily: 'monospace', fontSize: '8px', color: '#ffd23a' })
@@ -663,6 +768,70 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(3000, () => b.active && b.destroy());
   }
 
+  hitBreakable(bullet, blk) {
+    if (!blk.active) return;
+    const dmg = bullet.dmg || 1;
+    if (!bullet.pierce) this.killBullet(bullet);
+    blk.hp -= dmg;
+    this.spark(blk.x, blk.y, 0xcccccc, 5);
+    Sound.sfx('hit');
+    if (blk.hp > 0) { blk.setTintFill(0xffffff); this.time.delayedCall(60, () => blk.active && blk.clearTint()); return; }
+
+    const reward = blk.reward;
+    const rx = blk.x, ry = blk.y;
+    blk.destroy();
+    this.spark(rx, ry, 0xdddddd, 18);
+    Sound.sfx('break');
+    this.secretsFound++;
+
+    if (reward === 'heart' || reward === 'heartc') this.spawnItem(rx, ry - 4, reward);
+    else {
+      const pod = this.pods.create(rx, ry - 4, 'pod_' + reward);
+      pod.wtype = reward; pod.setDepth(6);
+      this.tweens.add({ targets: pod, y: ry - 11, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    }
+    this.time.delayedCall(180, () => Sound.sfx('secret'));
+    this.flashBanner(`SECRET  ${this.secretsFound}/${this.secretsTotal}`, '#88ffaa');
+  }
+
+  // A floating collectible. kind: 'heart' (refill) or 'heartc' (permanent +1 max).
+  spawnItem(x, y, kind) {
+    const it = this.items.create(x, y, kind);
+    it.kind = kind;
+    it.setDepth(7);
+    this.tweens.add({ targets: it, y: y - 6, duration: 820, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    return it;
+  }
+
+  takeItem(it) {
+    if (!it.active) return;
+    if (it.kind === 'heartc') {
+      this.maxHearts = Math.min(HEARTS_MAX, this.maxHearts + 1);
+      this.hearts = this.maxHearts;                       // a container tops you off, as in Zelda
+      this.score += 500;
+      this.flashBanner('HEART CONTAINER!', '#ffd23a');
+      Sound.sfx('secret');
+    } else {
+      if (this.hearts >= this.maxHearts) { this.score += 50; }
+      else this.hearts++;
+      this.flashBanner('+1 HEART', '#ff6a7a');
+      Sound.sfx('pickup');
+    }
+    this.spark(it.x, it.y, 0xff6a7a, 14);
+    it.destroy();
+    this.updateHud();
+  }
+
+  // Only ever one banner on screen. Breaking a block and grabbing what falls out
+  // can land in the same frame, and two overlapping labels are unreadable.
+  flashBanner(text, color) {
+    if (this._banner && this._banner.active) this._banner.destroy();
+    const t = this.add.text(GAME_W / 2, 86, text,
+      { fontFamily: 'monospace', fontSize: '12px', color }).setOrigin(0.5).setScrollFactor(0).setDepth(55);
+    this._banner = t;
+    this.tweens.add({ targets: t, alpha: 0, delay: 1000, duration: 600, onComplete: () => t.destroy() });
+  }
+
   takePod(pod) {
     if (!pod.active) return;
     this.weapon = pod.wtype;
@@ -672,9 +841,7 @@ class GameScene extends Phaser.Scene {
     pod.destroy();
     Sound.sfx('pickup');
     this.updateHud();
-    const t = this.add.text(GAME_W / 2, 86, WEAPONS[this.weapon].label + '!',
-      { fontFamily: 'monospace', fontSize: '12px', color: '#ffd23a' }).setOrigin(0.5).setScrollFactor(0).setDepth(55);
-    this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 600, onComplete: () => t.destroy() });
+    this.flashBanner(WEAPONS[this.weapon].label + '!', '#ffd23a');
   }
 
   // =====================================================
@@ -866,17 +1033,19 @@ class GameScene extends Phaser.Scene {
   damagePlayer() {
     if (this.riding) { this.damageCarriage(); return; }
     if (this.time.now < this.invulnUntil || this.gameOverFlag || this.won || this.sliding) return;
-    this.lives--; this.updateHud();
+    this.hearts--; this.updateHud();
     this.invulnUntil = this.time.now + 1300;
     this.chargeStart = 0;
     this.player.setVelocity(-this.facing * 120, -160);
     this.spark(this.player.x, this.player.y, 0xff5a3c);
     Sound.sfx('hurt');
-    if (this.lives <= 0) this.gameOver();
+    if (this.hearts <= 0) this.gameOver();
   }
 
   updateHud() {
-    this.hud.setText(`STAGE ${this.level}   DONALD x${Math.max(0, this.lives)}`);
+    const h = Math.max(0, this.hearts);
+    this.hud.setText(`STAGE ${this.level}  ${'\u2665'.repeat(h)}${'\u2661'.repeat(Math.max(0, this.maxHearts - h))}`);
+    this.hud.setColor(h <= 1 ? '#ff3b3b' : h <= 2 ? '#ffd23a' : '#ff6a7a');
     this.scoreHud.setText(`SCORE ${this.score}`);
     if (this.weaponHud) {
       const w = WEAPONS[this.weapon] || WEAPONS.normal;
@@ -982,13 +1151,18 @@ class GameScene extends Phaser.Scene {
     const title = last ? 'MISSION COMPLETE' : `STAGE ${this.level} CLEAR`;
     this.add.text(GAME_W / 2, 104, title, { fontFamily: 'monospace', fontSize: '18px', color: '#ffd23a' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     this.add.text(GAME_W / 2, 132, `SCORE ${this.score}`, { fontFamily: 'monospace', fontSize: '12px', color: '#fff' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
+    if (this.secretsTotal) {
+      const all = this.secretsFound >= this.secretsTotal;
+      this.add.text(GAME_W / 2, 148, `SECRETS ${this.secretsFound}/${this.secretsTotal}${all ? '   ALL FOUND!' : ''}`,
+        { fontFamily: 'monospace', fontSize: '10px', color: all ? '#88ffaa' : '#9aa4b4' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
+    }
     const prompt = last ? 'PRESS R / START TO PLAY AGAIN' : `PRESS R / START FOR STAGE ${this.level + 1}`;
-    this.add.text(GAME_W / 2, 162, prompt, { fontFamily: 'monospace', fontSize: '10px', color: '#88ffaa' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
+    this.add.text(GAME_W / 2, 174, prompt, { fontFamily: 'monospace', fontSize: '10px', color: '#88ffaa' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     if (last) {
       this.time.addEvent({ delay: 80, repeat: 45, callback: () => this.spark(Phaser.Math.Between(0, GAME_W), 16, Phaser.Display.Color.RandomRGB().color, 3) });
       this.pendingContinue = () => this.scene.start('Title');
     } else {
-      this.pendingContinue = () => this.scene.restart({ level: this.level + 1, score: this.score });
+      this.pendingContinue = () => this.scene.restart({ level: this.level + 1, score: this.score, maxHearts: this.maxHearts });
     }
   }
 
@@ -1002,11 +1176,11 @@ class GameScene extends Phaser.Scene {
     this.gameOverTexts = [t1, t2];
   }
 
-  // Respawn in place: refill lives and pick up right where the Donald fell.
+  // Respawn in place: refill hearts and pick up right where the Donald fell.
   revive() {
     if (this.gameOverTexts) { this.gameOverTexts.forEach(t => t.destroy()); this.gameOverTexts = null; }
     this.gameOverFlag = false;
-    this.lives = 3; this.updateHud();
+    this.hearts = this.maxHearts; this.updateHud();
     this.sliding = false; this.chargeStart = 0;
     this.player.setScale(1, 1).clearTint().setAlpha(1).setVelocity(0, 0);
     this.invulnUntil = this.time.now + 2000;
