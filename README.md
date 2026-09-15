@@ -27,9 +27,23 @@ the reliable path.
 | Slide   | Down + Jump           | Down + A        |
 | Kick    | V                     | Y               |
 | Restart | R                     | —               |
+| CRT on/off | C                  | —               |
 | Start   | Enter / Space         | Any button      |
 
 Hold shoot to build a charge shot. Slide and kick unlock in Stage 2.
+
+## CRT filter
+
+A post-processing shader (`crt.js`) emulates a CRT tube: scanlines, aperture
+grille, barrel distortion, phosphor bloom, chromatic aberration, mains-hum
+flicker and vignette. On by default, toggled with **C**.
+
+WebGL only. Under the Canvas renderer every entry point is a no-op and the game
+renders undistorted rather than failing.
+
+Barrel distortion is deliberately gentle (`k = 0.030`). Stronger curvature pushes
+the HUD at `(8, 6)` off the edge of the tube — at `0.055` roughly two-thirds of
+the score line's lit pixels are lost.
 
 ## Stages
 
@@ -49,6 +63,7 @@ Hold shoot to build a charge shot. Slide and kick unlock in Stage 2.
 ```
 index.html   page shell + canvas styling
 game.js      everything
+crt.js       CRT post-processing shader
 vendor/      Phaser, committed on purpose
 ```
 

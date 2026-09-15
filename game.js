@@ -183,6 +183,11 @@ class TitleScene extends Phaser.Scene {
     this.tweens.add({ targets: prompt, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
     this.add.text(cx, 240, 'KEYBOARD:  ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
     this.add.text(cx, 252, 'XBOX PAD:  STICK/D-PAD · A jump · X shoot · DOWN+A slide · Y kick · START', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
+    if (CRT.available()) {
+      this.add.text(cx, 264, 'C  toggle CRT filter', { fontFamily: 'monospace', fontSize: '8px', color: '#6f7d92' }).setOrigin(0.5);
+    }
+    CRT.apply(this);
+
     this.input.keyboard.once('keydown-ENTER', () => this.scene.start('Game'));
     this.input.keyboard.once('keydown-SPACE', () => this.scene.start('Game'));
     if (this.input.gamepad) this.input.gamepad.once('down', () => this.scene.start('Game'));
@@ -214,6 +219,8 @@ class GameScene extends Phaser.Scene {
     this.bossStarted = false;
 
     this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
+
+    CRT.apply(this);
 
     this.buildBackground(this.levelData.theme);
 
