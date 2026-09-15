@@ -395,6 +395,9 @@ class GameScene extends Phaser.Scene {
 
     // ---- HUD ----
     this.hud = this.add.text(8, 6, '', { fontFamily: 'monospace', fontSize: '10px', color: '#ffffff' }).setScrollFactor(0).setDepth(50);
+    // Score is right-aligned: the boss health bar owns the centre strip (x 173-307),
+    // and a single left-aligned HUD line ran underneath it during boss fights.
+    this.scoreHud = this.add.text(466, 6, '', { fontFamily: 'monospace', fontSize: '10px', color: '#ffffff' }).setOrigin(1, 0).setScrollFactor(0).setDepth(50);
     this.beastHud = this.add.text(8, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#88ffaa' }).setScrollFactor(0).setDepth(50).setVisible(false);
     this.updateHud();
     this.bossBarBg = this.add.rectangle(GAME_W / 2, 14, 134, 9, 0x222222).setScrollFactor(0).setDepth(50).setStrokeStyle(1, 0xffffff).setVisible(false);
@@ -748,7 +751,8 @@ class GameScene extends Phaser.Scene {
   }
 
   updateHud() {
-    this.hud.setText(`STAGE ${this.level}   DONALD x${Math.max(0, this.lives)}   SCORE ${this.score}`);
+    this.hud.setText(`STAGE ${this.level}   DONALD x${Math.max(0, this.lives)}`);
+    this.scoreHud.setText(`SCORE ${this.score}`);
     // Armour lives on its own line bottom-left: the top row collides with the boss bar.
     const riding = this.riding && this.carriage && this.carriage.active;
     this.beastHud.setVisible(!!riding);

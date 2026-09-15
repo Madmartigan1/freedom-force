@@ -60,7 +60,7 @@ void main() {
   blur += texture2D(uMainSampler, uv + vec2( 0.0, -px.y)).rgb;
   blur *= 0.25;
   float lum = dot(blur, vec3(0.299, 0.587, 0.114));
-  col += blur * smoothstep(0.55, 1.0, lum) * 0.35 * amt;
+  col += blur * smoothstep(0.72, 1.0, lum) * 0.30 * amt;
 
   // Scanlines, locked to the output surface so they stay crisp.
   float line = sin(uv.y * uResolution.y * 3.14159);
