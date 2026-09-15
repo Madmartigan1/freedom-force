@@ -13,6 +13,18 @@ const SLIDE_SPEED = 260, SLIDE_TIME = 420, SLIDE_CD = 260;  // ms
 const KICK_CD = 360, KICK_RANGE = 24;
 const CHARGE_TIME = 600;               // ms held for a full charge shot
 
+// ---------- weapons ----------
+// Picked up mid-stage and held until the stage ends. Anything other than the
+// default rifle overrides Stage 2's charge shot: a power-up should feel like a
+// straight upgrade, not a trade against a mechanic you already have.
+const WEAPONS = {
+  normal:  { cd: 170, sfx: 'shoot',   label: 'RIFLE',       tint: 0xffffff, letter: 'R' },
+  machine: { cd: 75,  sfx: 'machine', label: 'MACHINE GUN', tint: 0xff9e18, letter: 'M' },
+  spread:  { cd: 250, sfx: 'spread',  label: 'SPREAD',      tint: 0x7fffa0, letter: 'S' },
+  laser:   { cd: 290, sfx: 'laser',   label: 'LASER',       tint: 0x8fd9ff, letter: 'L' },
+};
+const WEAPON_ORDER = ['machine', 'spread', 'laser'];
+
 // ---------- THE BEAST (rideable carriage) ----------
 const CAR_ARMOR = 8;                   // shells the carriage soaks before it blows
 const CAR_SPEED = 205;                 // faster than on foot (145)
@@ -32,6 +44,7 @@ const LEVELS = [
              [1940,175],[2180,210],[2440,140],[2680,210],[2960,150]],
     boss: { key: 'obama', name: 'BARACK O.', hp: 10 },
     carriage: 900,
+    pickups: [[620, 200, 'machine'], [1480, 130, 'spread'], [2380, 132, 'laser']],
   },
   {
     theme: 'neon', enhanced: true,
@@ -41,6 +54,7 @@ const LEVELS = [
              [1880,175],[2120,210],[2380,140],[2620,210],[2880,150],[3080,210]],
     boss: { key: 'robo', name: 'OMEGA AGENT', hp: 16 },
     carriage: 760,
+    pickups: [[520, 200, 'spread'], [1260, 130, 'laser'], [2180, 126, 'machine']],
   },
   {
     theme: 'marble', enhanced: true,
@@ -51,6 +65,7 @@ const LEVELS = [
              [1820,175],[2060,210],[2300,140],[2540,210],[2800,150],[3040,185],[3220,210]],
     boss: { key: 'idol', name: 'THE GOLDEN IDOL', hp: 22 },
     carriage: 620,
+    pickups: [[430, 200, 'laser'], [1200, 126, 'machine'], [2360, 170, 'spread'], [2880, 166, 'laser']],
   },
 ];
 
@@ -197,6 +212,35 @@ function drawCarriage(ctx, frame) {
   R(10, 1, 8, 1, '#ff6a5a');
 }
 
+// ---------- weapon pod ----------
+const GLYPH = {
+  R: ['110','101','110','101','101'],
+  M: ['101','111','111','101','101'],
+  S: ['111','100','111','001','111'],
+  L: ['100','100','100','100','111'],
+};
+function makePod(scene, key, letter, colorHex) {
+  // Integer-aligned throughout: fractional fillRect coords smear the glyph rows
+  // together. Bright letter on a dark core — the reverse had far too little
+  // contrast to read at 20px wide.
+  const W = 22, H = 16;
+  const tex = scene.textures.createCanvas(key, W, H);
+  const c = tex.context;
+  const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  R(2, 2, 18, 12, colorHex);                        // coloured shell
+  R(2, 2, 18, 1, '#ffffff');                        // lit top edge
+  R(2, 13, 18, 1, '#00000077');                     // shaded bottom
+  R(4, 3, 14, 10, '#141018');                       // dark core
+  R(0, 6, 2, 4, '#c9921c'); R(20, 6, 2, 4, '#c9921c');
+  R(0, 6, 2, 1, '#ffe27a'); R(20, 6, 2, 1, '#ffe27a');
+  // 3x5 glyph at 2x2 px per cell -> 6x10, centred in the dark core
+  const g = GLYPH[letter] || GLYPH.R;
+  for (let ry = 0; ry < 5; ry++)
+    for (let rx = 0; rx < 3; rx++)
+      if (g[ry][rx] === '1') R(8 + rx * 2, 3 + ry * 2, 2, 2, colorHex);
+  tex.refresh();
+}
+
 function makeCarriage(scene, key, frame) {
   const tex = scene.textures.createCanvas(key, CAR_W, CAR_H);
   drawCarriage(tex.context, frame);
@@ -236,6 +280,11 @@ class BootScene extends Phaser.Scene {
     const idol = { w: 46, h: 62, skin: '#d9a521', hair: '#ffe27a', hairStyle: 'swoop', suit: '#8c6a14', tie: '#d21f1f', pants: '#6b500f', eye: '#ffffff' };
     makeChar(this, 'idol0', { ...idol, frame: 0 });
     makeChar(this, 'idol1', { ...idol, frame: 1 });
+
+    // weapon pods
+    makePod(this, 'pod_machine', 'M', '#ff9e18');
+    makePod(this, 'pod_spread',  'S', '#7fffa0');
+    makePod(this, 'pod_laser',   'L', '#8fd9ff');
 
     // THE BEAST
     makeCarriage(this, 'car0', 0);
@@ -291,13 +340,15 @@ class TitleScene extends Phaser.Scene {
     this.add.text(cx, 188, '3 STAGES  ·  NEW MOVES  ·  RIDE THE BEAST', { fontFamily: 'monospace', fontSize: '9px', color: '#27e0e0' }).setOrigin(0.5);
     const prompt = this.add.text(cx, 214, 'PRESS ENTER  /  (A) TO START', { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' }).setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
-    this.add.text(cx, 240, 'KEYBOARD:  ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
+    this.add.text(cx, 240, 'KEYBOARD: ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick · M mute', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
     this.add.text(cx, 252, 'XBOX PAD:  STICK/D-PAD · A jump · X shoot · DOWN+A slide · Y kick · START', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
     if (CRT.available()) {
       this.add.text(cx, 264, 'C  toggle CRT filter', { fontFamily: 'monospace', fontSize: '8px', color: '#6f7d92' }).setOrigin(0.5);
     }
     CRT.apply(this);
 
+    this.input.keyboard.on('keydown', () => Sound.init());
+    this.input.gamepad && this.input.gamepad.on('down', () => Sound.init());
     this.input.keyboard.once('keydown-ENTER', () => this.scene.start('Game'));
     this.input.keyboard.once('keydown-SPACE', () => this.scene.start('Game'));
     if (this.input.gamepad) this.input.gamepad.once('down', () => this.scene.start('Game'));
@@ -328,6 +379,7 @@ class GameScene extends Phaser.Scene {
     this.padJumpPrev = false; this.padStartPrev = false; this.padSlidePrev = false; this.padKickPrev = false;
     this.bossStarted = false;
     this.riding = false; this.carriage = null; this.ramCdUntil = 0;
+    this.weapon = 'normal';
 
     this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
 
@@ -380,6 +432,16 @@ class GameScene extends Phaser.Scene {
     // ---- grunts ----
     this.levelData.grunts.forEach(s => this.spawnGrunt(s[0], s[1]));
 
+    // ---- weapon pods ----
+    this.pods = this.physics.add.group({ allowGravity: false });
+    (this.levelData.pickups || []).forEach(([x, y, type]) => {
+      const pod = this.pods.create(x, y, 'pod_' + type);
+      pod.wtype = type;
+      pod.setDepth(6);
+      this.tweens.add({ targets: pod, y: y - 7, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    });
+    this.physics.add.overlap(this.player, this.pods, (pl, pod) => this.takePod(pod));
+
     // ---- THE BEAST ----
     this.mountHint = this.add.text(0, 0, '\u25b2 UP TO RIDE', { fontFamily: 'monospace', fontSize: '8px', color: '#ffd23a' })
       .setOrigin(0.5).setDepth(20).setVisible(false);
@@ -398,13 +460,24 @@ class GameScene extends Phaser.Scene {
     // Score is right-aligned: the boss health bar owns the centre strip (x 173-307),
     // and a single left-aligned HUD line ran underneath it during boss fights.
     this.scoreHud = this.add.text(466, 6, '', { fontFamily: 'monospace', fontSize: '10px', color: '#ffffff' }).setOrigin(1, 0).setScrollFactor(0).setDepth(50);
-    this.beastHud = this.add.text(8, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#88ffaa' }).setScrollFactor(0).setDepth(50).setVisible(false);
+    this.beastHud = this.add.text(8, 238, '', { fontFamily: 'monospace', fontSize: '9px', color: '#88ffaa' }).setScrollFactor(0).setDepth(50).setVisible(false);
+    this.weaponHud = this.add.text(8, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#ffffff' }).setScrollFactor(0).setDepth(50);
     this.updateHud();
     this.bossBarBg = this.add.rectangle(GAME_W / 2, 14, 134, 9, 0x222222).setScrollFactor(0).setDepth(50).setStrokeStyle(1, 0xffffff).setVisible(false);
     this.bossBar = this.add.rectangle(GAME_W / 2 - 65, 14, 130, 5, 0xff3b3b).setOrigin(0, 0.5).setScrollFactor(0).setDepth(51).setVisible(false);
     this.bossLabel = this.add.text(GAME_W / 2, 26, '', { fontFamily: 'monospace', fontSize: '8px', color: '#ffd23a' }).setOrigin(0.5).setScrollFactor(0).setDepth(50).setVisible(false);
 
     this.bossTriggerX = WORLD_W - 520;
+
+    Sound.init();
+    Sound.music(this.level);
+    this.input.keyboard.on('keydown-M', () => {
+      const m = Sound.toggleMute();
+      const t = this.add.text(GAME_W / 2, 100, m ? 'SOUND OFF' : 'SOUND ON',
+        { fontFamily: 'monospace', fontSize: '10px', color: '#ffd23a' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
+      this.tweens.add({ targets: t, alpha: 0, delay: 500, duration: 500, onComplete: () => t.destroy() });
+    });
+    this.events.once('shutdown', () => Sound.stopMusic());
 
     // ---- Stage 2 new-moves hint ----
     if (this.enhanced) {
@@ -547,16 +620,39 @@ class GameScene extends Phaser.Scene {
 
   killBullet(b) { if (b && b.active) { this.spark(b.x, b.y, 0xffffff, 3); b.destroy(); } }
 
-  spawnPlayerBullet(ax, ay, charged) {
+  // Fires the held weapon. Spread fans five ways; laser pierces.
+  fireWeapon(ax, ay) {
+    const w = this.weapon;
+    if (w === 'spread') {
+      const base = Math.atan2(ay, ax);
+      for (let i = -2; i <= 2; i++) {
+        const an = base + i * 0.20;
+        this.spawnPlayerBullet(Math.cos(an), Math.sin(an), false, { tint: WEAPONS.spread.tint });
+      }
+    } else if (w === 'laser') {
+      this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.laser.tint, pierce: true, dmg: 2, speed: 1.9, scaleX: 2.2 });
+    } else if (w === 'machine') {
+      this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.machine.tint });
+    } else {
+      this.spawnPlayerBullet(ax, ay, false);
+    }
+    Sound.sfx(WEAPONS[w].sfx);
+  }
+
+  spawnPlayerBullet(ax, ay, charged, opt) {
+    const o = opt || {};
     const p = this.player;
     const mx = p.x + (ax !== 0 ? Math.sign(ax) * 10 : 0);
     const my = p.y - 4 + (ay > 0 ? 8 : 0) + (ay < 0 ? -2 : 0);
     const b = this.pbullets.create(mx, my, charged ? 'cbullet' : 'pbullet');
     const len = Math.hypot(ax, ay) || 1;
-    const spd = charged ? BULLET_SPEED * 1.35 : BULLET_SPEED;
+    const spd = (charged ? BULLET_SPEED * 1.35 : BULLET_SPEED) * (o.speed || 1);
     b.setVelocity(ax / len * spd, ay / len * spd);
     b.rotation = Math.atan2(ay, ax); b.setDepth(6);
-    b.dmg = charged ? 3 : 1;
+    b.dmg = o.dmg || (charged ? 3 : 1);
+    if (o.tint) b.setTint(o.tint);
+    if (o.pierce) b.pierce = true;
+    if (o.scaleX) b.setScale(o.scaleX, 1);
     this.time.delayedCall(charged ? 1800 : 1400, () => b.active && b.destroy());
   }
 
@@ -565,6 +661,20 @@ class GameScene extends Phaser.Scene {
     let ax = tx - x, ay = ty - y; const len = Math.hypot(ax, ay) || 1;
     b.setVelocity(ax / len * speed, ay / len * speed); b.setDepth(6);
     this.time.delayedCall(3000, () => b.active && b.destroy());
+  }
+
+  takePod(pod) {
+    if (!pod.active) return;
+    this.weapon = pod.wtype;
+    this.chargeStart = 0; this.player.clearTint();
+    this.spark(pod.x, pod.y, WEAPONS[pod.wtype].tint, 14);
+    this.score += 200;
+    pod.destroy();
+    Sound.sfx('pickup');
+    this.updateHud();
+    const t = this.add.text(GAME_W / 2, 86, WEAPONS[this.weapon].label + '!',
+      { fontFamily: 'monospace', fontSize: '12px', color: '#ffd23a' }).setOrigin(0.5).setScrollFactor(0).setDepth(55);
+    this.tweens.add({ targets: t, alpha: 0, delay: 900, duration: 600, onComplete: () => t.destroy() });
   }
 
   // =====================================================
@@ -614,6 +724,7 @@ class GameScene extends Phaser.Scene {
     p.setVisible(false);
     c.play('car-roll');
     c.setFlipX(this.facing < 0);
+    Sound.sfx('mount');
     this.cameras.main.startFollow(c, true, 0.12, 0.12);
     this.spark(c.x, c.y, 0xffe27a, 16);
     this.updateHud();
@@ -643,6 +754,7 @@ class GameScene extends Phaser.Scene {
     c.armor--;
     c.setTintFill(0xffffff);
     this.time.delayedCall(70, () => c.active && c.clearTint());
+    Sound.sfx('hit');
     this.cameras.main.shake(90, 0.004);
     this.updateHud();
     if (c.armor <= 0) this.explodeCarriage();
@@ -653,6 +765,7 @@ class GameScene extends Phaser.Scene {
     this.spark(c.x, c.y, 0xffe27a, 26);
     this.spark(c.x, c.y - 6, 0xff5a3c, 20);
     this.cameras.main.shake(320, 0.012);
+    Sound.sfx('explode');
     this.dismountCarriage(true);
     c.destroy();
     this.carriage = null;
@@ -670,6 +783,7 @@ class GameScene extends Phaser.Scene {
     b.setDepth(6);
     b.dmg = CAR_SHELL_DMG;
     this.spark(mx, my, 0xffe27a, 4);
+    Sound.sfx('cannon');
     this.cameras.main.shake(60, 0.003);
     c.body.velocity.x -= this.facing * 26;          // recoil
     this.time.delayedCall(1600, () => b.active && b.destroy());
@@ -718,6 +832,7 @@ class GameScene extends Phaser.Scene {
     const p = this.player;
     const kx = p.x + this.facing * 18, ky = p.y + 2;
     this.spark(kx, ky, 0xffffff, 7);
+    Sound.sfx('kick');
     this.enemies.getChildren().forEach(e => {
       if (!e.active) return;
       if (Math.abs(e.x - kx) < KICK_RANGE && Math.abs(e.y - ky) < 26) {
@@ -732,11 +847,20 @@ class GameScene extends Phaser.Scene {
 
   hitEnemy(b, e) {
     const dmg = b.dmg || 1;
-    this.killBullet(b);
+    if (b.pierce) {
+      // A laser passes through; damage each enemy once.
+      b.hitList = b.hitList || [];
+      if (b.hitList.includes(e)) return;
+      b.hitList.push(e);
+      this.spark(e.x, e.y, 0x8fd9ff, 4);
+    } else {
+      this.killBullet(b);
+    }
     if (e.isBoss) { this.hitBoss(e, dmg); return; }
     e.hp -= dmg; e.setTintFill(0xffffff);
     this.time.delayedCall(60, () => e.active && e.clearTint());
-    if (e.hp <= 0) { this.spark(e.x, e.y, 0xffc14d); e.destroy(); this.score += 100; this.updateHud(); }
+    if (e.hp <= 0) { this.spark(e.x, e.y, 0xffc14d); e.destroy(); this.score += 100; this.updateHud(); Sound.sfx('explode'); }
+    else Sound.sfx('hit');
   }
 
   damagePlayer() {
@@ -747,12 +871,18 @@ class GameScene extends Phaser.Scene {
     this.chargeStart = 0;
     this.player.setVelocity(-this.facing * 120, -160);
     this.spark(this.player.x, this.player.y, 0xff5a3c);
+    Sound.sfx('hurt');
     if (this.lives <= 0) this.gameOver();
   }
 
   updateHud() {
     this.hud.setText(`STAGE ${this.level}   DONALD x${Math.max(0, this.lives)}`);
     this.scoreHud.setText(`SCORE ${this.score}`);
+    if (this.weaponHud) {
+      const w = WEAPONS[this.weapon] || WEAPONS.normal;
+      this.weaponHud.setText('\u2b24 ' + w.label);
+      this.weaponHud.setColor(Phaser.Display.Color.IntegerToColor(w.tint).rgba);
+    }
     // Armour lives on its own line bottom-left: the top row collides with the boss bar.
     const riding = this.riding && this.carriage && this.carriage.active;
     this.beastHud.setVisible(!!riding);
@@ -787,6 +917,7 @@ class GameScene extends Phaser.Scene {
     this.enemies.add(boss);
     this.physics.add.collider(boss, this.solids);
 
+    Sound.sfx('warn');
     this.bossBarBg.setVisible(true);
     this.bossBar.setVisible(true).scaleX = 1;
     this.bossLabel.setVisible(true).setText(bcfg.name);
@@ -843,6 +974,8 @@ class GameScene extends Phaser.Scene {
   win(boss) {
     if (this.won) return; this.won = true;
     this.spark(boss.x, boss.y, 0xffffff, 30); boss.destroy();
+    Sound.stopMusic(); Sound.sfx('explode');
+    this.time.delayedCall(700, () => Sound.sfx('clear'));
     this.ebullets.clear(true, true);
     this.physics.pause();
     const last = this.level >= LEVELS.length;
@@ -863,6 +996,7 @@ class GameScene extends Phaser.Scene {
     if (this.gameOverFlag) return; this.gameOverFlag = true;
     this.player.setTint(0x555555);
     this.physics.pause();
+    Sound.stopMusic(); Sound.sfx('gameover');
     const t1 = this.add.text(GAME_W / 2, 110, 'GAME OVER', { fontFamily: 'monospace', fontSize: '24px', color: '#ff3b3b' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     const t2 = this.add.text(GAME_W / 2, 146, 'PRESS R / START TO CONTINUE HERE', { fontFamily: 'monospace', fontSize: '9px', color: '#fff' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     this.gameOverTexts = [t1, t2];
@@ -877,6 +1011,7 @@ class GameScene extends Phaser.Scene {
     this.player.setScale(1, 1).clearTint().setAlpha(1).setVelocity(0, 0);
     this.invulnUntil = this.time.now + 2000;
     this.physics.resume();
+    Sound.music(this.level);
   }
 
   // ---- main loop ----
@@ -945,6 +1080,7 @@ class GameScene extends Phaser.Scene {
       this.invulnUntil = Math.max(this.invulnUntil, time + SLIDE_TIME + 80); // i-frames cover the whole slide + recovery
       this.chargeStart = 0; p.clearTint();
       p.setScale(1, 0.7);
+      Sound.sfx('kick');
     }
 
     if (this.sliding) {
@@ -963,7 +1099,7 @@ class GameScene extends Phaser.Scene {
       else p.setVelocityX(0);
 
       // ----- jump (+ variable height, somersault); Down+Jump was consumed by the slide above -----
-      if (jumpJustPressed && onGround) { p.setVelocityY(-335); this.jumping = true; }
+      if (jumpJustPressed && onGround) { p.setVelocityY(-335); this.jumping = true; Sound.sfx('jump'); }
       if (!jumpHeld && pb.velocity.y < -120) p.setVelocityY(pb.velocity.y * 0.55);
 
       // ----- animation + Contra somersault -----
@@ -993,7 +1129,13 @@ class GameScene extends Phaser.Scene {
       }
 
       // ----- shoot (Stage 1: rapid fire · Stage 2: hold to charge) -----
-      if (this.enhanced) {
+      if (this.weapon !== 'normal') {
+        // Power-ups are straight rapid fire at their own cadence.
+        if (shootHeld && time > this.nextShot) {
+          this.nextShot = time + WEAPONS[this.weapon].cd;
+          this.fireWeapon(ax, ay);
+        }
+      } else if (this.enhanced) {
         if (shootHeld) {
           if (this.chargeStart === 0) this.chargeStart = time;
           const charged = time - this.chargeStart >= CHARGE_TIME;
@@ -1003,9 +1145,14 @@ class GameScene extends Phaser.Scene {
           const held = time - this.chargeStart; this.chargeStart = 0;
           p.clearTint();
           this.spawnPlayerBullet(ax, ay, held >= CHARGE_TIME);      // release to fire (charged if held long enough)
+          Sound.sfx(held >= CHARGE_TIME ? 'cannon' : 'shoot');
         }
       } else {
-        if (shootHeld && time > this.nextShot) { this.nextShot = time + 170; this.spawnPlayerBullet(ax, ay, false); }
+        if (shootHeld && time > this.nextShot) {
+          this.nextShot = time + WEAPONS.normal.cd;
+          this.spawnPlayerBullet(ax, ay, false);
+          Sound.sfx('shoot');
+        }
       }
     }
 

@@ -29,6 +29,7 @@ the reliable path.
 | Ride    | Up (next to THE BEAST)| Up / D-pad Up   |
 | Eject   | V                     | Y               |
 | Restart | R                     | —               |
+| Mute    | M                     | —               |
 | CRT on/off | C                  | —               |
 | Start   | Enter / Space         | Any button      |
 
@@ -46,6 +47,30 @@ renders undistorted rather than failing.
 Barrel distortion is deliberately gentle (`k = 0.030`). Stronger curvature pushes
 the HUD at `(8, 6)` off the edge of the tube — at `0.055` roughly two-thirds of
 the score line's lit pixels are lost.
+
+## Weapons
+
+Three pods are scattered through each stage. Run into one to swap weapon; you
+keep it until the stage ends.
+
+| Pod | Weapon | Behaviour |
+| --- | ------ | --------- |
+| **M** | Machine gun | 75ms cadence — roughly twice the rifle's rate |
+| **S** | Spread | Five-way fan, one damage each |
+| **L** | Laser | Pierces every enemy in the line, two damage |
+
+Anything other than the default rifle overrides Stage 2's charge shot. A power-up
+should read as a straight upgrade, not a trade against a mechanic you already have.
+
+## Sound
+
+Every sound is synthesised at runtime from oscillators and filtered noise — no
+audio files, the same approach as the sprites. Fifteen effects plus a driving
+chiptune loop per stage (bass, arp lead and a noise kit) run by a lookahead
+scheduler, so timing does not drift with the frame rate.
+
+Browsers refuse to start an AudioContext before a user gesture, so audio arms
+itself on the first keypress or button. **M** mutes.
 
 ## THE BEAST
 
@@ -79,6 +104,7 @@ to climb aboard.
 index.html   page shell + canvas styling
 game.js      everything
 crt.js       CRT post-processing shader
+audio.js     procedural chiptune + SFX
 vendor/      Phaser, committed on purpose
 ```
 
@@ -91,7 +117,8 @@ is to let it become something else.
   a mechanic, a set piece, a joke that needs the room.
 - **No build step.** No bundler, no transpiler, no `npm install`. Editing `game.js` and
   hitting refresh stays the entire development loop.
-- **No external assets.** Sprites stay procedural. No image files, no sprite sheets.
+- **No external assets.** Sprites stay procedural and sound stays synthesised.
+  No image files, no sprite sheets, no audio files.
 - **No backend, accounts, or online play.** It is a local single-player game.
 - **Not a balanced competitive game.** It is a joke with good game feel.
 
