@@ -1,0 +1,13 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+*~
+.*.swp
+
+# Editors
+.vscode/
+.idea/
+
+# Logs / scratch
+*.log
+scratch/
