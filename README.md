@@ -98,11 +98,25 @@ to climb aboard.
 - Faster than running, with a heavier jump. **V / Y** to step out; it keeps whatever
   armour is left, so you can come back for it.
 
+## THE VAULT
+
+A top-down Zelda-style dungeon, reached after Stage 3. Gravity is off, movement
+and shooting are 8-way, and the camera snaps room to room rather than scrolling,
+the way A Link to the Past does.
+
+- **Nine rooms** in a 3x3 grid. Walk off a screen edge to move between them;
+  each populates itself the first time you enter.
+- **Find the small key**, then stand at the locked door and press **Space / A**
+  to open it. The boss chamber is behind it.
+- Rooms hide a heart container, refills and weapon pods.
+- Your hearts, score and weapon carry in from Stage 3.
+
 ## Stages
 
 1. **City** — 8-bit classic styling. Boss: `BARACK O.` (10 HP)
 2. **Neon** — enhanced tech styling, new moves. Boss: `OMEGA AGENT` (16 HP)
 3. **Marble** — dawn over a gilded capitol. Boss: `THE GOLDEN IDOL` (22 HP)
+4. **THE VAULT** — top-down dungeon. Boss: a second Golden Idol (20 HP)
 
 ## How it's built
 
@@ -111,14 +125,18 @@ to climb aboard.
 - **Zero art assets.** Every sprite is drawn procedurally at runtime by `drawHumanoid()`
   in `game.js`, using a beveled light/shadow box routine (`shbox`) to fake the 16-bit
   shaded look. Nothing to lose, nothing to re-export.
-- **One file of game logic.** `game.js` holds level data, three Phaser scenes
-  (Boot / Title / Game), and all mechanics.
+- **Plain scripts, no modules or bundler.** Load order matters and is fixed in
+  `index.html`: `dungeon.js` reads constants from `game.js` at load time, while
+  `game.js` needs `DungeonScene` for its scene list, so the `Phaser.Game` call
+  lives alone in `main.js` and loads last.
 
 ```
 index.html   page shell + canvas styling
-game.js      everything
+game.js      side-scrolling stages, sprites, most gameplay
+dungeon.js   THE VAULT — the top-down dungeon scene
 crt.js       CRT post-processing shader
 audio.js     procedural chiptune + SFX
+main.js      Phaser bootstrap; loads last, see its header
 vendor/      Phaser, committed on purpose
 ```
 

@@ -345,6 +345,26 @@ class BootScene extends Phaser.Scene {
     makeChar(this, 'idol0', { ...idol, frame: 0 });
     makeChar(this, 'idol1', { ...idol, frame: 1 });
 
+    // dungeon: locked door slab + the small key that opens it
+    {
+      const d = this.textures.createCanvas('lockdoor', 16, 16), dc = d.context;
+      dc.fillStyle = '#4a3410'; dc.fillRect(0, 0, 16, 16);
+      dc.fillStyle = '#c9921c'; dc.fillRect(1, 1, 14, 14);
+      dc.fillStyle = '#ffe27a'; dc.fillRect(1, 1, 14, 2);
+      dc.fillStyle = '#7a5810'; dc.fillRect(1, 13, 14, 2);
+      dc.fillStyle = '#2a2118'; dc.fillRect(6, 5, 4, 4); dc.fillRect(7, 8, 2, 4);
+      d.refresh();
+
+      const k = this.textures.createCanvas('smallkey', 14, 8), kc = k.context;
+      kc.fillStyle = '#7a5810'; kc.fillRect(0, 1, 6, 6);
+      kc.fillStyle = '#ffd23a'; kc.fillRect(1, 2, 4, 4);
+      kc.fillStyle = '#2a2118'; kc.fillRect(2, 3, 2, 2);
+      kc.fillStyle = '#ffd23a'; kc.fillRect(6, 3, 8, 2);
+      kc.fillRect(11, 5, 2, 2); kc.fillRect(8, 5, 2, 2);
+      kc.fillStyle = '#ffe27a'; kc.fillRect(6, 3, 8, 1);
+      k.refresh();
+    }
+
     // breakable blocks, one per theme
     makeCrackedBlock(this, 'brk_city',   '#4a3f52', '#6d6080', '#241c2b');
     makeCrackedBlock(this, 'brk_neon',   '#241a3a', '#4a2f6e', '#0d0718');
@@ -410,7 +430,7 @@ class TitleScene extends Phaser.Scene {
     this.add.text(cx, 50, 'OPERATION', { fontFamily: 'monospace', fontSize: '26px', color: '#ffd23a' }).setOrigin(0.5);
     this.add.text(cx, 80, 'FREEDOM FORCE', { fontFamily: 'monospace', fontSize: '26px', color: '#ff5a3c' }).setOrigin(0.5);
     this.add.image(cx, 142, 'trump0').setScale(3.2);
-    this.add.text(cx, 188, '3 STAGES  ·  NEW MOVES  ·  RIDE THE BEAST', { fontFamily: 'monospace', fontSize: '9px', color: '#27e0e0' }).setOrigin(0.5);
+    this.add.text(cx, 188, '3 STAGES + THE VAULT  ·  RIDE THE BEAST', { fontFamily: 'monospace', fontSize: '9px', color: '#27e0e0' }).setOrigin(0.5);
     const prompt = this.add.text(cx, 214, 'PRESS ENTER  /  (A) TO START', { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' }).setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
     this.add.text(cx, 240, 'KEYBOARD: ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick · M mute', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
@@ -1148,7 +1168,7 @@ class GameScene extends Phaser.Scene {
     this.ebullets.clear(true, true);
     this.physics.pause();
     const last = this.level >= LEVELS.length;
-    const title = last ? 'MISSION COMPLETE' : `STAGE ${this.level} CLEAR`;
+    const title = last ? 'THE VAULT AWAITS' : `STAGE ${this.level} CLEAR`;
     this.add.text(GAME_W / 2, 104, title, { fontFamily: 'monospace', fontSize: '18px', color: '#ffd23a' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     this.add.text(GAME_W / 2, 132, `SCORE ${this.score}`, { fontFamily: 'monospace', fontSize: '12px', color: '#fff' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     if (this.secretsTotal) {
@@ -1156,11 +1176,12 @@ class GameScene extends Phaser.Scene {
       this.add.text(GAME_W / 2, 148, `SECRETS ${this.secretsFound}/${this.secretsTotal}${all ? '   ALL FOUND!' : ''}`,
         { fontFamily: 'monospace', fontSize: '10px', color: all ? '#88ffaa' : '#9aa4b4' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     }
-    const prompt = last ? 'PRESS R / START TO PLAY AGAIN' : `PRESS R / START FOR STAGE ${this.level + 1}`;
+    const prompt = last ? 'PRESS R / START TO ENTER THE VAULT' : `PRESS R / START FOR STAGE ${this.level + 1}`;
     this.add.text(GAME_W / 2, 174, prompt, { fontFamily: 'monospace', fontSize: '10px', color: '#88ffaa' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     if (last) {
       this.time.addEvent({ delay: 80, repeat: 45, callback: () => this.spark(Phaser.Math.Between(0, GAME_W), 16, Phaser.Display.Color.RandomRGB().color, 3) });
-      this.pendingContinue = () => this.scene.start('Title');
+      this.pendingContinue = () => this.scene.start('Dungeon',
+        { score: this.score, maxHearts: this.maxHearts, weapon: this.weapon });
     } else {
       this.pendingContinue = () => this.scene.restart({ level: this.level + 1, score: this.score, maxHearts: this.maxHearts });
     }
@@ -1353,16 +1374,3 @@ class GameScene extends Phaser.Scene {
     if (!this.bossStarted && p.x > this.bossTriggerX) this.startBoss();
   }
 }
-
-// =============================================================
-new Phaser.Game({
-  type: Phaser.AUTO,
-  width: GAME_W, height: GAME_H,
-  parent: 'game',
-  pixelArt: true,
-  backgroundColor: '#101826',
-  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-  input: { gamepad: true },
-  physics: { default: 'arcade', arcade: { gravity: { y: 900 }, debug: false } },
-  scene: [BootScene, TitleScene, GameScene]
-});
