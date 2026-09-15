@@ -26,6 +26,8 @@ the reliable path.
 | Shoot   | X or J                | X               |
 | Slide   | Down + Jump           | Down + A        |
 | Kick    | V                     | Y               |
+| Ride    | Up (next to THE BEAST)| Up / D-pad Up   |
+| Eject   | V                     | Y               |
 | Restart | R                     | —               |
 | CRT on/off | C                  | —               |
 | Start   | Enter / Space         | Any button      |
@@ -45,10 +47,23 @@ Barrel distortion is deliberately gentle (`k = 0.030`). Stronger curvature pushe
 the HUD at `(8, 6)` off the edge of the tube — at `0.055` roughly two-thirds of
 the score line's lit pixels are lost.
 
+## THE BEAST
+
+Partway into every stage sits a gilded armoured carriage. Walk up and press **Up**
+to climb aboard.
+
+- **8 armour.** Hits chip the armour instead of costing a life; at zero it blows up
+  and throws the Donald clear with mercy-invincibility.
+- **Cannon** — heavy shells, 3× a normal bullet's damage, angled with up/down.
+- **Ram** — flattens grunts on contact, staggers a boss.
+- Faster than running, with a heavier jump. **V / Y** to step out; it keeps whatever
+  armour is left, so you can come back for it.
+
 ## Stages
 
 1. **City** — 8-bit classic styling. Boss: `BARACK O.` (10 HP)
 2. **Neon** — enhanced tech styling, new moves. Boss: `OMEGA AGENT` (16 HP)
+3. **Marble** — dawn over a gilded capitol. Boss: `THE GOLDEN IDOL` (22 HP)
 
 ## How it's built
 
@@ -72,7 +87,8 @@ vendor/      Phaser, committed on purpose
 Written down deliberately. This is a small parody game and the fastest way to kill it
 is to let it become something else.
 
-- **Not an ever-expanding stage list.** New stages need a reason beyond "one more."
+- **Not an ever-expanding stage list.** New stages need a reason beyond "one more" —
+  a mechanic, a set piece, a joke that needs the room.
 - **No build step.** No bundler, no transpiler, no `npm install`. Editing `game.js` and
   hitting refresh stays the entire development loop.
 - **No external assets.** Sprites stay procedural. No image files, no sprite sheets.

@@ -13,6 +13,15 @@ const SLIDE_SPEED = 260, SLIDE_TIME = 420, SLIDE_CD = 260;  // ms
 const KICK_CD = 360, KICK_RANGE = 24;
 const CHARGE_TIME = 600;               // ms held for a full charge shot
 
+// ---------- THE BEAST (rideable carriage) ----------
+const CAR_ARMOR = 8;                   // shells the carriage soaks before it blows
+const CAR_SPEED = 205;                 // faster than on foot (145)
+const CAR_JUMP = -290;                 // heavier hop than the Donald's -335
+const CAR_FIRE_CD = 300;               // cannon cadence
+const CAR_SHELL_SPEED = 500;
+const CAR_SHELL_DMG = 3;
+const CAR_MOUNT_RANGE = 34;
+
 // ---------- Level data (Stage 1 = classic, Stage 2 = enhanced) ----------
 const LEVELS = [
   {
@@ -22,6 +31,7 @@ const LEVELS = [
     grunts: [[500,210],[780,210],[1000,150],[1240,210],[1480,140],[1700,210],
              [1940,175],[2180,210],[2440,140],[2680,210],[2960,150]],
     boss: { key: 'obama', name: 'BARACK O.', hp: 10 },
+    carriage: 900,
   },
   {
     theme: 'neon', enhanced: true,
@@ -30,6 +40,17 @@ const LEVELS = [
     grunts: [[520,210],[720,150],[940,210],[1180,150],[1420,210],[1640,150],
              [1880,175],[2120,210],[2380,140],[2620,210],[2880,150],[3080,210]],
     boss: { key: 'robo', name: 'OMEGA AGENT', hp: 16 },
+    carriage: 760,
+  },
+  {
+    theme: 'marble', enhanced: true,
+    plats: [[340,190,100],[540,152,90],[740,196,90],[940,158,110],[1180,144,90],
+            [1400,192,90],[1620,150,110],[1860,182,90],[2100,140,100],[2340,188,110],
+            [2600,150,100],[2860,184,90],[3100,146,100]],
+    grunts: [[480,210],[700,150],[900,210],[1120,145],[1360,210],[1580,150],
+             [1820,175],[2060,210],[2300,140],[2540,210],[2800,150],[3040,185],[3220,210]],
+    boss: { key: 'idol', name: 'THE GOLDEN IDOL', hp: 22 },
+    carriage: 620,
   },
 ];
 
@@ -110,6 +131,78 @@ function drawHumanoid(ctx, o) {
   R(cx + w * 0.55, armY, w * 0.16, torsoH * 0.12, '#9aa0a8');
 }
 
+// ---------- THE BEAST: the Donald's gilded armored carriage ----------
+// Drawn facing RIGHT, same convention as the humanoids.
+const CAR_W = 52, CAR_H = 30;
+function drawCarriage(ctx, frame) {
+  const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x | 0, y | 0, Math.max(1, w | 0), Math.max(1, h | 0)); };
+  const GOLD = '#c9921c', HI = '#ffe27a', LO = '#7a5810', PLATE = '#a8790f';
+  const IRON = '#3a3f47', IRON_HI = '#767d88', GLASS = '#16243f';
+
+  // ---- wheels (armoured, spokes spin between frames) ----
+  const wheel = (cx, cy) => {
+    ctx.save(); ctx.translate(cx, cy);
+    ctx.fillStyle = '#15181d'; ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = IRON;      ctx.beginPath(); ctx.arc(0, 0, 4.5, 0, Math.PI * 2); ctx.fill();
+    ctx.rotate(frame ? Math.PI / 4 : 0);
+    ctx.fillStyle = HI;
+    for (let i = 0; i < 4; i++) { ctx.fillRect(-0.7, -4, 1.4, 8); ctx.rotate(Math.PI / 4); }
+    ctx.fillStyle = GOLD; ctx.beginPath(); ctx.arc(0, 0, 1.8, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  };
+  wheel(14, 24); wheel(38, 24);
+
+  // ---- chassis / armour skirt ----
+  shbox(ctx, 6, 19, 40, 5, PLATE);
+  R(6, 19, 40, 1, HI);
+  for (let x = 8; x < 44; x += 6) R(x, 21, 3, 2, LO);          // rivet dither
+
+  // ---- main body ----
+  shbox(ctx, 7, 8, 38, 12, GOLD);
+  R(7, 8, 38, 1, HI);                                          // lit roofline
+  R(7, 8, 1, 12, HI);                                          // lit left edge
+  R(44, 9, 1, 11, LO);                                         // shadowed right edge
+  R(9, 17, 34, 1, LO);                                         // lower shade band
+
+  // ---- armoured glass + a very small Donald at the wheel ----
+  R(11, 10, 14, 7, GLASS);
+  R(11, 10, 14, 1, '#31507f');                                 // glare
+  R(15, 12, 5, 4, '#e3a86b');                                  // face
+  R(15, 11, 6, 2, '#f4d43a');                                  // hair
+  R(21, 11, 2, 1, '#f4d43a');                                  // swoop
+  R(16, 13, 1, 1, '#1b1b1b'); R(18, 13, 1, 1, '#1b1b1b');      // eyes
+
+  // ---- rear cargo: gilded strongboxes ----
+  shbox(ctx, 27, 11, 7, 6, '#8c6a14');
+  shbox(ctx, 34, 12, 6, 5, '#8c6a14');
+  R(28, 13, 5, 1, HI); R(35, 14, 4, 1, HI);
+
+  // ---- cannon ----
+  shbox(ctx, 24, 3, 14, 5, IRON);
+  R(24, 3, 14, 1, IRON_HI);
+  shbox(ctx, 38, 4, 11, 3, IRON);
+  R(49, 4, 2, 3, '#1d2026');                                   // muzzle
+  R(26, 5, 3, 2, GOLD);                                        // gilded collar
+
+  // ---- ram / plough ----
+  ctx.fillStyle = IRON;
+  ctx.beginPath(); ctx.moveTo(45, 10); ctx.lineTo(52, 19); ctx.lineTo(45, 23); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = IRON_HI;
+  ctx.beginPath(); ctx.moveTo(45, 10); ctx.lineTo(52, 19); ctx.lineTo(48, 19); ctx.closePath(); ctx.fill();
+  R(45, 12, 1, 10, HI);
+
+  // ---- pennant ----
+  R(9, 0, 1, 9, '#d8d8d8');
+  R(10, 1, 8, 4, '#d21f1f');
+  R(10, 1, 8, 1, '#ff6a5a');
+}
+
+function makeCarriage(scene, key, frame) {
+  const tex = scene.textures.createCanvas(key, CAR_W, CAR_H);
+  drawCarriage(tex.context, frame);
+  tex.refresh();
+}
+
 function makeChar(scene, key, o) {
   const tex = scene.textures.createCanvas(key, o.w, o.h);
   drawHumanoid(tex.context, o);
@@ -139,6 +232,15 @@ class BootScene extends Phaser.Scene {
     makeChar(this, 'robo0', { ...robo, frame: 0 });
     makeChar(this, 'robo1', { ...robo, frame: 1 });
 
+    // Stage 3 boss — a gilded colossus
+    const idol = { w: 46, h: 62, skin: '#d9a521', hair: '#ffe27a', hairStyle: 'swoop', suit: '#8c6a14', tie: '#d21f1f', pants: '#6b500f', eye: '#ffffff' };
+    makeChar(this, 'idol0', { ...idol, frame: 0 });
+    makeChar(this, 'idol1', { ...idol, frame: 1 });
+
+    // THE BEAST
+    makeCarriage(this, 'car0', 0);
+    makeCarriage(this, 'car1', 1);
+
     const g = this.add.graphics();
     // player bullet — shaded amber tracer with a white core
     g.fillStyle(0xff9e18, 1).fillRect(0, 0, 9, 4);
@@ -155,6 +257,12 @@ class BootScene extends Phaser.Scene {
     g.fillStyle(0xff5a3c, 1).fillCircle(4, 4, 3);
     g.fillStyle(0xffd0a0, 1).fillCircle(3, 3, 1);
     g.generateTexture('ebullet', 9, 9); g.clear();
+    // cannon shell — heavy iron slug with a gold band
+    g.fillStyle(0x2a2f38, 1).fillRect(0, 0, 14, 6);
+    g.fillStyle(0x767d88, 1).fillRect(0, 1, 13, 3);
+    g.fillStyle(0xffe27a, 1).fillRect(3, 0, 3, 6);
+    g.fillStyle(0xffffff, 1).fillRect(9, 2, 4, 1);
+    g.generateTexture('shell', 14, 6); g.clear();
     g.fillStyle(0xffffff, 1).fillRect(0, 0, 3, 3); g.generateTexture('spark', 3, 3); g.clear();
     g.destroy();
 
@@ -162,6 +270,8 @@ class BootScene extends Phaser.Scene {
     this.anims.create({ key: 'grunt-run', frames: [{ key: 'grunt0' }, { key: 'grunt1' }], frameRate: 8, repeat: -1 });
     this.anims.create({ key: 'obama-run', frames: [{ key: 'obama0' }, { key: 'obama1' }], frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'robo-run', frames: [{ key: 'robo0' }, { key: 'robo1' }], frameRate: 6, repeat: -1 });
+    this.anims.create({ key: 'idol-run', frames: [{ key: 'idol0' }, { key: 'idol1' }], frameRate: 5, repeat: -1 });
+    this.anims.create({ key: 'car-roll', frames: [{ key: 'car0' }, { key: 'car1' }], frameRate: 14, repeat: -1 });
 
     this.scene.start('Title');
   }
@@ -178,7 +288,7 @@ class TitleScene extends Phaser.Scene {
     this.add.text(cx, 50, 'OPERATION', { fontFamily: 'monospace', fontSize: '26px', color: '#ffd23a' }).setOrigin(0.5);
     this.add.text(cx, 80, 'FREEDOM FORCE', { fontFamily: 'monospace', fontSize: '26px', color: '#ff5a3c' }).setOrigin(0.5);
     this.add.image(cx, 142, 'trump0').setScale(3.2);
-    this.add.text(cx, 188, '2 STAGES  ·  STAGE 2 UNLOCKS NEW MOVES', { fontFamily: 'monospace', fontSize: '9px', color: '#27e0e0' }).setOrigin(0.5);
+    this.add.text(cx, 188, '3 STAGES  ·  NEW MOVES  ·  RIDE THE BEAST', { fontFamily: 'monospace', fontSize: '9px', color: '#27e0e0' }).setOrigin(0.5);
     const prompt = this.add.text(cx, 214, 'PRESS ENTER  /  (A) TO START', { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' }).setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
     this.add.text(cx, 240, 'KEYBOARD:  ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
@@ -217,6 +327,7 @@ class GameScene extends Phaser.Scene {
     this.chargeStart = 0; this.kickCdUntil = 0;
     this.padJumpPrev = false; this.padStartPrev = false; this.padSlidePrev = false; this.padKickPrev = false;
     this.bossStarted = false;
+    this.riding = false; this.carriage = null; this.ramCdUntil = 0;
 
     this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
 
@@ -269,6 +380,11 @@ class GameScene extends Phaser.Scene {
     // ---- grunts ----
     this.levelData.grunts.forEach(s => this.spawnGrunt(s[0], s[1]));
 
+    // ---- THE BEAST ----
+    this.mountHint = this.add.text(0, 0, '\u25b2 UP TO RIDE', { fontFamily: 'monospace', fontSize: '8px', color: '#ffd23a' })
+      .setOrigin(0.5).setDepth(20).setVisible(false);
+    if (this.levelData.carriage) this.spawnCarriage(this.levelData.carriage);
+
     // ---- input ----
     this.keys = this.input.keyboard.addKeys({
       left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN',
@@ -279,6 +395,7 @@ class GameScene extends Phaser.Scene {
 
     // ---- HUD ----
     this.hud = this.add.text(8, 6, '', { fontFamily: 'monospace', fontSize: '10px', color: '#ffffff' }).setScrollFactor(0).setDepth(50);
+    this.beastHud = this.add.text(8, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#88ffaa' }).setScrollFactor(0).setDepth(50).setVisible(false);
     this.updateHud();
     this.bossBarBg = this.add.rectangle(GAME_W / 2, 14, 134, 9, 0x222222).setScrollFactor(0).setDepth(50).setStrokeStyle(1, 0xffffff).setVisible(false);
     this.bossBar = this.add.rectangle(GAME_W / 2 - 65, 14, 130, 5, 0xff3b3b).setOrigin(0, 0.5).setScrollFactor(0).setDepth(51).setVisible(false);
@@ -333,6 +450,42 @@ class GameScene extends Phaser.Scene {
         bld.fillStyle(wc, 1);
         for (let wy = GROUND_TOP - bh + 6; wy < GROUND_TOP - 6; wy += 12)
           for (let wx = x + 6; wx < x + 54; wx += 12) bld.fillRect(wx, wy, 5, 5);
+      }
+    } else if (theme === 'marble') {
+      this.cameras.main.setBackgroundColor('#2a2033');
+      this.skyGradient(0x3a2a52, 0xffc98a, GAME_H);   // dawn: violet → gold
+      // low sun burning through the haze
+      this.add.circle(96, 76, 44, 0xffd99a, 0.14).setScrollFactor(0.15);
+      this.add.circle(96, 76, 30, 0xffe9c4, 0.30).setScrollFactor(0.15);
+      this.add.circle(96, 76, 21, 0xfff4de).setScrollFactor(0.15);
+      // distant ridge
+      const far = this.add.graphics().setScrollFactor(0.2);
+      far.fillStyle(0x4a3a5c, 1);
+      for (let x = -80; x < WORLD_W; x += 150) far.fillTriangle(x, GROUND_TOP, x + 75, GROUND_TOP - 56, x + 150, GROUND_TOP);
+      // the gilded dome, once per stretch
+      const dome = this.add.graphics().setScrollFactor(0.34);
+      for (let x = 120; x < WORLD_W; x += 1150) {
+        dome.fillStyle(0x6b5540, 1).fillRect(x - 54, GROUND_TOP - 96, 108, 96);     // block
+        dome.fillStyle(0x8a6f52, 1).fillRect(x - 54, GROUND_TOP - 96, 108, 3);
+        dome.fillStyle(0xc9921c, 1).fillCircle(x, GROUND_TOP - 96, 34);             // dome
+        dome.fillStyle(0xffe27a, 1).fillCircle(x - 9, GROUND_TOP - 104, 13);        // lit side
+        dome.fillStyle(0x7a5810, 1).fillRect(x - 34, GROUND_TOP - 96, 68, 3);       // springline shadow
+        dome.fillStyle(0xffe27a, 1).fillRect(x - 2, GROUND_TOP - 142, 4, 16);       // spire
+        dome.fillStyle(0xfff4de, 1).fillRect(x - 1, GROUND_TOP - 146, 2, 5);
+      }
+      // marble colonnade
+      const col = this.add.graphics().setScrollFactor(0.58);
+      for (let x = 0; x < WORLD_W; x += 96) {
+        const ch = 58 + ((x * 11) % 44);
+        col.fillStyle(0x6d6480, 1).fillRect(x, GROUND_TOP - ch, 72, ch);            // wall
+        col.fillStyle(0x8f86a6, 1).fillRect(x, GROUND_TOP - ch, 72, 4);             // entablature
+        col.fillStyle(0xc9921c, 1).fillRect(x, GROUND_TOP - ch + 4, 72, 2);         // gold frieze
+        for (let cx = x + 6; cx < x + 68; cx += 15) {
+          col.fillStyle(0xb9b0cc, 1).fillRect(cx, GROUND_TOP - ch + 7, 8, ch - 7);  // shaft
+          col.fillStyle(0xe4dcf2, 1).fillRect(cx, GROUND_TOP - ch + 7, 2, ch - 7);  // lit edge
+          col.fillStyle(0x4f4860, 1).fillRect(cx + 7, GROUND_TOP - ch + 7, 1, ch - 7);
+          col.fillStyle(0xd9cff0, 1).fillRect(cx - 1, GROUND_TOP - ch + 7, 10, 2);  // capital
+        }
       }
     } else {
       this.cameras.main.setBackgroundColor('#1b2740');
@@ -411,6 +564,152 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(3000, () => b.active && b.destroy());
   }
 
+  // =====================================================
+  //  THE BEAST — mount, drive, fire, die
+  // =====================================================
+  spawnCarriage(x) {
+    const c = this.physics.add.sprite(x, GROUND_TOP - 20, 'car0');
+    c.body.setSize(46, 24).setOffset(3, 5);
+    c.setCollideWorldBounds(true).setDepth(4);
+    c.armor = CAR_ARMOR;
+    c.setBounce(0);
+    this.carriage = c;
+
+    this.physics.add.collider(c, this.solids);
+    // ramming: flattens grunts, staggers a boss
+    this.physics.add.overlap(c, this.enemies, (cc, e) => {
+      if (!this.riding || !e.active) return;
+      if (e.isBoss) {
+        if (this.time.now < this.ramCdUntil) return;
+        this.ramCdUntil = this.time.now + 420;
+        e.setVelocityY(-150); e.body.velocity.x = this.facing * 180;
+        this.hitBoss(e, 2);
+        this.spark(e.x, e.y, 0xffe27a, 12);
+        this.cameras.main.shake(140, 0.006);
+      } else {
+        this.spark(e.x, e.y, 0xffc14d, 10);
+        e.destroy(); this.score += 150; this.updateHud();
+      }
+    });
+    this.physics.add.overlap(this.ebullets, c, (cc, b) => {
+      // Phaser hands these back in group/object order; find the bullet either way.
+      const bullet = (b && b.texture && b.texture.key === 'ebullet') ? b : cc;
+      if (!this.riding) return;
+      this.killBullet(bullet);
+      this.damageCarriage();
+    });
+    return c;
+  }
+
+  mountCarriage() {
+    const p = this.player, c = this.carriage;
+    this.riding = true;
+    this.mountHint.setVisible(false);
+    this.sliding = false; this.chargeStart = 0;
+    p.setScale(1, 1).clearTint().setAlpha(1);
+    p.body.enable = false;
+    p.setVisible(false);
+    c.play('car-roll');
+    c.setFlipX(this.facing < 0);
+    this.cameras.main.startFollow(c, true, 0.12, 0.12);
+    this.spark(c.x, c.y, 0xffe27a, 16);
+    this.updateHud();
+
+    const t = this.add.text(GAME_W / 2, 74, 'THE BEAST!   V / Y TO EJECT',
+      { fontFamily: 'monospace', fontSize: '9px', color: '#ffd23a' }).setOrigin(0.5).setScrollFactor(0).setDepth(55);
+    this.tweens.add({ targets: t, alpha: 0, delay: 1800, duration: 700, onComplete: () => t.destroy() });
+  }
+
+  // Step out under your own power; the carriage keeps its remaining armour.
+  dismountCarriage(ejected) {
+    const p = this.player, c = this.carriage;
+    this.riding = false;
+    p.body.enable = true;
+    p.setVisible(true);
+    p.setPosition(c.x - this.facing * 10, c.y - 26);
+    p.setVelocity(ejected ? -this.facing * 90 : 0, ejected ? -240 : -120);
+    if (c.active) { c.stop(); c.setTexture('car0'); c.setVelocityX(0); }
+    this.cameras.main.startFollow(p, true, 0.12, 0.12);
+    if (ejected) this.invulnUntil = Math.max(this.invulnUntil, this.time.now + 1600);
+    this.updateHud();
+  }
+
+  damageCarriage() {
+    const c = this.carriage;
+    if (!this.riding || !c.active) return;
+    c.armor--;
+    c.setTintFill(0xffffff);
+    this.time.delayedCall(70, () => c.active && c.clearTint());
+    this.cameras.main.shake(90, 0.004);
+    this.updateHud();
+    if (c.armor <= 0) this.explodeCarriage();
+  }
+
+  explodeCarriage() {
+    const c = this.carriage;
+    this.spark(c.x, c.y, 0xffe27a, 26);
+    this.spark(c.x, c.y - 6, 0xff5a3c, 20);
+    this.cameras.main.shake(320, 0.012);
+    this.dismountCarriage(true);
+    c.destroy();
+    this.carriage = null;
+    this.updateHud();
+  }
+
+  fireCannon(ay) {
+    const c = this.carriage;
+    const mx = c.x + this.facing * 26, my = c.y - 11;
+    const b = this.pbullets.create(mx, my, 'shell');
+    const ax = this.facing;
+    const len = Math.hypot(ax, ay) || 1;
+    b.setVelocity(ax / len * CAR_SHELL_SPEED, ay / len * CAR_SHELL_SPEED);
+    b.rotation = Math.atan2(ay, ax);
+    b.setDepth(6);
+    b.dmg = CAR_SHELL_DMG;
+    this.spark(mx, my, 0xffe27a, 4);
+    this.cameras.main.shake(60, 0.003);
+    c.body.velocity.x -= this.facing * 26;          // recoil
+    this.time.delayedCall(1600, () => b.active && b.destroy());
+  }
+
+  updateCarriage(time, delta, inp) {
+    const c = this.carriage, cb = c.body, p = this.player;
+    if (!c.active) { this.riding = false; return; }
+
+    // floor + boss-arena clamp, mirroring the on-foot net
+    if (cb.bottom > GROUND_TOP + 2) { cb.y = (GROUND_TOP + 2) - cb.height; if (cb.velocity.y > 0) cb.velocity.y = 0; }
+    if (this.bossStarted) {
+      if (cb.x < this.arenaMinX) { cb.x = this.arenaMinX; if (cb.velocity.x < 0) cb.velocity.x = 0; }
+      if (cb.right > this.arenaMaxX) { cb.x = this.arenaMaxX - cb.width; if (cb.velocity.x > 0) cb.velocity.x = 0; }
+    }
+    const onGround = cb.blocked.down || cb.touching.down || cb.bottom >= GROUND_TOP + 1;
+
+    // drive
+    if (inp.left && !inp.right) { c.setVelocityX(-CAR_SPEED); this.facing = -1; c.setFlipX(true); }
+    else if (inp.right && !inp.left) { c.setVelocityX(CAR_SPEED); this.facing = 1; c.setFlipX(false); }
+    else c.setVelocityX(cb.velocity.x * 0.82);      // heavy coast
+
+    if (Math.abs(cb.velocity.x) > 12) { if (c.anims.currentAnim?.key !== 'car-roll') c.play('car-roll'); }
+    else { c.stop(); c.setTexture('car0'); }
+
+    if (inp.jumpJustPressed && onGround) { c.setVelocityY(CAR_JUMP); this.spark(c.x, c.y + 12, 0xbbbbbb, 5); }
+
+    // cannon — flat, or angled with up/down
+    let ay = 0;
+    if (inp.up) ay = -0.55; else if (inp.down && !onGround) ay = 0.55;
+    if (inp.shootHeld && time > this.nextShot) { this.nextShot = time + CAR_FIRE_CD; this.fireCannon(ay); }
+
+    // eject
+    if (inp.kickPressed) { this.dismountCarriage(false); return; }
+
+    // keep the hidden player glued on for camera/bookkeeping
+    p.setPosition(c.x, c.y - 6);
+
+    // exhaust
+    if (Math.abs(cb.velocity.x) > 40 && Math.floor(time / 90) % 2 === 0)
+      this.spark(c.x - this.facing * 26, c.y + 8, 0x6b7280, 1);
+  }
+
   // melee kick: destroys grunts, deflects bullets, chips + knocks the boss
   doKick() {
     const p = this.player;
@@ -438,6 +737,7 @@ class GameScene extends Phaser.Scene {
   }
 
   damagePlayer() {
+    if (this.riding) { this.damageCarriage(); return; }
     if (this.time.now < this.invulnUntil || this.gameOverFlag || this.won || this.sliding) return;
     this.lives--; this.updateHud();
     this.invulnUntil = this.time.now + 1300;
@@ -447,7 +747,17 @@ class GameScene extends Phaser.Scene {
     if (this.lives <= 0) this.gameOver();
   }
 
-  updateHud() { this.hud.setText(`STAGE ${this.level}   DONALD x${Math.max(0, this.lives)}   SCORE ${this.score}`); }
+  updateHud() {
+    this.hud.setText(`STAGE ${this.level}   DONALD x${Math.max(0, this.lives)}   SCORE ${this.score}`);
+    // Armour lives on its own line bottom-left: the top row collides with the boss bar.
+    const riding = this.riding && this.carriage && this.carriage.active;
+    this.beastHud.setVisible(!!riding);
+    if (riding) {
+      const a = this.carriage.armor;
+      this.beastHud.setText(`BEAST ${'\u2588'.repeat(a)}${'\u2591'.repeat(Math.max(0, CAR_ARMOR - a))}`);
+      this.beastHud.setColor(a <= 2 ? '#ff5a3c' : a <= 4 ? '#ffd23a' : '#88ffaa');
+    }
+  }
 
   // ---- boss ----
   startBoss() {
@@ -600,6 +910,19 @@ class GameScene extends Phaser.Scene {
     const right = k.right.isDown || k.d.isDown || padRight;
     const up    = k.up.isDown    || k.w.isDown || padUp;
     const down  = k.down.isDown  || k.s.isDown || padDown;
+    const shootHeld = k.shoot.isDown || k.shoot2.isDown || padShoot;
+
+    // ---- mount prompt / mounting ----
+    if (this.carriage && this.carriage.active && !this.riding) {
+      const near = Math.abs(p.x - this.carriage.x) < CAR_MOUNT_RANGE && Math.abs(p.y - this.carriage.y) < 34;
+      this.mountHint.setVisible(near);
+      if (near) this.mountHint.setPosition(this.carriage.x, this.carriage.y - 26);
+      if (near && up) { this.mountCarriage(); return; }
+    }
+
+    if (this.riding) {
+      this.updateCarriage(time, delta, { left, right, up, down, jumpJustPressed, shootHeld, kickPressed });
+    } else {
 
     // ---- player floor + arena safety net ----
     let clampedGround = false;
@@ -666,7 +989,6 @@ class GameScene extends Phaser.Scene {
       }
 
       // ----- shoot (Stage 1: rapid fire · Stage 2: hold to charge) -----
-      const shootHeld = k.shoot.isDown || k.shoot2.isDown || padShoot;
       if (this.enhanced) {
         if (shootHeld) {
           if (this.chargeStart === 0) this.chargeStart = time;
@@ -682,6 +1004,8 @@ class GameScene extends Phaser.Scene {
         if (shootHeld && time > this.nextShot) { this.nextShot = time + 170; this.spawnPlayerBullet(ax, ay, false); }
       }
     }
+
+    }   // end on-foot branch
 
     // ---- enemies ----
     this.enemies.getChildren().forEach(e => {
