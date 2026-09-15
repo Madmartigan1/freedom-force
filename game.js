@@ -433,18 +433,52 @@ class TitleScene extends Phaser.Scene {
     this.add.text(cx, 188, '3 STAGES + THE VAULT  ·  RIDE THE BEAST', { fontFamily: 'monospace', fontSize: '9px', color: '#27e0e0' }).setOrigin(0.5);
     const prompt = this.add.text(cx, 214, 'PRESS ENTER  /  (A) TO START', { fontFamily: 'monospace', fontSize: '12px', color: '#ffffff' }).setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.2, duration: 600, yoyo: true, repeat: -1 });
-    this.add.text(cx, 240, 'KEYBOARD: ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick · M mute', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
-    this.add.text(cx, 252, 'XBOX PAD:  STICK/D-PAD · A jump · X shoot · DOWN+A slide · Y kick · START', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
+    this.add.text(cx, 238, 'KEYBOARD: ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick · M mute', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
+    this.add.text(cx, 250, 'XBOX PAD:  STICK/D-PAD · A jump · X shoot · DOWN+A slide · Y kick · START', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
     if (CRT.available()) {
-      this.add.text(cx, 264, 'C  toggle CRT filter', { fontFamily: 'monospace', fontSize: '8px', color: '#6f7d92' }).setOrigin(0.5);
+      this.add.text(cx, 262, 'C  toggle CRT filter', { fontFamily: 'monospace', fontSize: '8px', color: '#6f7d92' }).setOrigin(0.5);
     }
     CRT.apply(this);
 
+    // Stage select. THE VAULT sits behind three stages of run-and-gun, which is
+    // a long way to go to see it; this makes every stage reachable immediately.
+    this.add.text(cx, 202, '1 · 2 · 3  STAGE SELECT        4  THE VAULT',
+      { fontFamily: 'monospace', fontSize: '9px', color: '#ffd23a' }).setOrigin(0.5);
+    ['ONE', 'TWO', 'THREE'].forEach((k, i) => {
+      this.input.keyboard.once('keydown-' + k, () => {
+        Sound.init();
+        this.scene.start('Game', { level: i + 1, score: 0 });
+      });
+    });
+    this.input.keyboard.once('keydown-FOUR', () => {
+      Sound.init();
+      this.scene.start('Dungeon', { score: 0, maxHearts: HEARTS_START + 1, weapon: 'spread' });
+    });
+
     this.input.keyboard.on('keydown', () => Sound.init());
-    this.input.gamepad && this.input.gamepad.on('down', () => Sound.init());
     this.input.keyboard.once('keydown-ENTER', () => this.scene.start('Game'));
     this.input.keyboard.once('keydown-SPACE', () => this.scene.start('Game'));
-    if (this.input.gamepad) this.input.gamepad.once('down', () => this.scene.start('Game'));
+
+    // An already-connected pad emits a 'down' the moment this scene starts —
+    // not a real press. Taking it at face value skipped the title screen in
+    // about 250ms, so the pad is armed late and the button must really be held.
+    // Starting on the pad's 'down' event skipped this screen in ~250ms: a
+    // connected pad fires one immediately, and a trigger resting as "pressed"
+    // keeps firing. Poll for a real rising edge instead, seeding the baseline
+    // on the first frame so an already-held button never counts as a press.
+    if (this.input.gamepad) this.input.gamepad.on('down', () => Sound.init());
+    this.padPrev = undefined;
+  }
+
+  update() {
+    const gp = this.input.gamepad;
+    const pad = (gp && gp.total) ? gp.getPad(0) : null;
+    if (!pad) return;
+    const pressed = !!(pad.A || pad.B || pad.X || pad.Y ||
+      (pad.buttons[9] && pad.buttons[9].pressed));
+    if (this.padPrev === undefined) { this.padPrev = pressed; return; }  // seed only
+    if (pressed && !this.padPrev) { Sound.init(); this.scene.start('Game'); }
+    this.padPrev = pressed;
   }
 }
 
