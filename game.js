@@ -62,7 +62,7 @@ const LEVELS = [
             [1460,190,80],[1680,155,100],[1920,180,90],[2160,145,90],[2420,185,110],[2700,155,100],[2980,180,90]],
     grunts: [[520,210],[720,150],[940,210],[1180,150],[1420,210],[1640,150],
              [1880,175],[2120,210],[2380,140],[2620,210],[2880,150],[3080,210]],
-    boss: { key: 'robo', name: 'OMEGA AGENT', hp: 16 },
+    boss: { key: 'robo', name: 'THE ZUCKSTER', hp: 16 },
     carriage: 760,
     pickups: [[520, 200, 'spread'], [1260, 130, 'laser'], [2180, 126, 'machine']],
     secrets: [[880, 214, 'heartc'], [1720, 214, 'heart'], [2560, 128, 'spread']],
@@ -75,7 +75,7 @@ const LEVELS = [
             [2600,150,100],[2860,184,90],[3100,146,100]],
     grunts: [[480,210],[700,150],[900,210],[1120,145],[1360,210],[1580,150],
              [1820,175],[2060,210],[2300,140],[2540,210],[2800,150],[3040,185],[3220,210]],
-    boss: { key: 'idol', name: 'THE GOLDEN IDOL', hp: 22 },
+    boss: { key: 'rocket', name: 'ROCKET MAN X', hp: 22 },
     carriage: 620,
     pickups: [[430, 200, 'laser'], [1200, 126, 'machine'], [2360, 170, 'spread'], [2880, 166, 'laser']],
     secrets: [[760, 214, 'heartc'], [1640, 214, 'heart'], [2240, 214, 'heart'], [3000, 126, 'machine']],
@@ -103,7 +103,8 @@ function shbox(ctx, x, y, w, h, base) {
 
 // ---------- procedural SHADED humanoid (draws facing RIGHT) ----------
 function drawHumanoid(ctx, o) {
-  const { w, h, skin, hair, suit, tie, pants = suit, shoe = '#141414', hairStyle = 'short', eye = '#20140a', frame = 0 } = o;
+  const { w, h, skin, hair, suit, tie, pants = suit, shoe = '#141414', hairStyle = 'short',
+          eye = '#20140a', frame = 0, outfit = 'suit', brow = null } = o;
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2;
   const R = (x, y, ww, hh, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(ww)), Math.max(1, Math.round(hh))); };
@@ -121,14 +122,22 @@ function drawHumanoid(ctx, o) {
   shbox(ctx, cx - sp - legW, legY + legH - 3, legW + 1, 3, shoe);
   shbox(ctx, cx + sp, legY + legH - 3, legW + 1, 3, shoe);
 
-  // torso (shaded suit) + lapels + shirt + tie
+  // torso
   shbox(ctx, torsoX, torsoY, torsoW, torsoH, suit);
-  R(torsoX + 2, torsoY + 1, 2, torsoH * 0.55, shade(suit, -34));
-  R(torsoX + torsoW - 4, torsoY + 1, 2, torsoH * 0.55, shade(suit, -34));
-  R(cx - 2, torsoY + 1, 4, torsoH * 0.85, '#f2f2f2');
-  R(cx - 1, torsoY + 1, 2, torsoH * 0.78, tie);
-  R(cx - 1, torsoY + 1, 1, torsoH * 0.5, shade(tie, 45));            // tie highlight
-  R(cx, torsoY + torsoH * 0.55, 1, 1, shade(suit, 45));             // button glint
+  if (outfit === 'tee') {
+    // crew neck: collar band, sleeve seams, a soft fold shadow. No lapels, no tie.
+    R(cx - torsoW * 0.22, torsoY, torsoW * 0.44, 2, shade(suit, 30));
+    R(torsoX + 1, torsoY + 2, 2, torsoH * 0.34, shade(suit, 16));
+    R(torsoX + torsoW - 3, torsoY + 2, 2, torsoH * 0.34, shade(suit, -22));
+    R(torsoX + 2, torsoY + torsoH * 0.62, torsoW - 4, 1, shade(suit, -26));
+  } else {
+    R(torsoX + 2, torsoY + 1, 2, torsoH * 0.55, shade(suit, -34));
+    R(torsoX + torsoW - 4, torsoY + 1, 2, torsoH * 0.55, shade(suit, -34));
+    R(cx - 2, torsoY + 1, 4, torsoH * 0.85, '#f2f2f2');
+    R(cx - 1, torsoY + 1, 2, torsoH * 0.78, tie);
+    R(cx - 1, torsoY + 1, 1, torsoH * 0.5, shade(tie, 45));          // tie highlight
+    R(cx, torsoY + torsoH * 0.55, 1, 1, shade(suit, 45));           // button glint
+  }
 
   // head (shaded) + face detail
   shbox(ctx, headX, headY, headW, headH, skin);
@@ -139,6 +148,10 @@ function drawHumanoid(ctx, o) {
   R(headX + headW * 0.26, headY + headH * 0.5, 2, 2, eye);
   R(headX + headW * 0.60, headY + headH * 0.5, 2, 2, eye);
   R(headX + headW * 0.34, headY + headH * 0.78, headW * 0.34, 1, shade(skin, -34)); // mouth
+  if (brow) {                                                        // heavy brow reads as a different face entirely
+    R(headX + headW * 0.22, headY + headH * 0.36, headW * 0.22, 1, brow);
+    R(headX + headW * 0.56, headY + headH * 0.36, headW * 0.22, 1, brow);
+  }
 
   // hair (shaded + sheen)
   if (hairStyle === 'swoop') {          // The Donald: big yellow sweep
@@ -146,6 +159,18 @@ function drawHumanoid(ctx, o) {
     R(headX - 2, headY, 2, headH * 0.55, hair);
     R(headX + headW, headY, 2, headH * 0.30, hair);
     R(headX, headY - h * 0.028, headW * 0.7, 1, shade(hair, 50));
+  } else if (hairStyle === 'bowl') {     // The Zuckster: flat fringe, straight across
+    shbox(ctx, headX - 2, headY - h * 0.03, headW + 4, h * 0.09, hair);
+    R(headX - 2, headY, 2, headH * 0.70, hair);                      // long sides
+    R(headX + headW, headY, 2, headH * 0.70, hair);
+    R(headX - 1, headY + headH * 0.26, headW + 2, 2, hair);          // the fringe line
+    R(headX, headY - h * 0.012, headW * 0.6, 1, shade(hair, 38));
+  } else if (hairStyle === 'wave') {     // ROCKET MAN: swept back with a widow's peak
+    shbox(ctx, headX - 1, headY - h * 0.035, headW + 2, h * 0.08, hair);
+    R(cx - 1, headY - h * 0.012, 3, 3, hair);                        // peak
+    R(headX - 1, headY, 1, headH * 0.42, hair);
+    R(headX + headW, headY, 1, headH * 0.34, hair);
+    R(headX + headW * 0.2, headY - h * 0.02, headW * 0.55, 1, shade(hair, 46));
   } else {                               // short crop / helmet
     shbox(ctx, headX - 1, headY - h * 0.02, headW + 2, h * 0.07, hair);
     R(headX - 1, headY, 1, headH * 0.55, hair);
@@ -335,13 +360,23 @@ class BootScene extends Phaser.Scene {
     makeChar(this, 'obama0', { ...obama, frame: 0 });
     makeChar(this, 'obama1', { ...obama, frame: 1 });
 
-    // Stage 2 boss — a chrome cyber-agent with a red visor
-    const robo = { w: 44, h: 60, skin: '#b9c2cc', hair: '#5a6473', hairStyle: 'short', suit: '#33405a', tie: '#ff3b3b', pants: '#28324a', eye: '#ff3b3b' };
+    // Stage 2 boss — THE ZUCKSTER: bowl cut, grey tee, unblinking
+    const robo = { w: 44, h: 60, skin: '#e8d4c0', hair: '#7a5a3a', hairStyle: 'bowl', outfit: 'tee',
+                   suit: '#8d95a3', tie: '#8d95a3', pants: '#2f3a44',
+                   eye: '#1b3a6b', brow: '#5e432a', shoe: '#e9e9ec' };
     makeChar(this, 'robo0', { ...robo, frame: 0 });
     makeChar(this, 'robo1', { ...robo, frame: 1 });
 
-    // Stage 3 boss — a gilded colossus
-    const idol = { w: 46, h: 62, skin: '#d9a521', hair: '#ffe27a', hairStyle: 'swoop', suit: '#8c6a14', tie: '#d21f1f', pants: '#6b500f', eye: '#ffffff' };
+    // Stage 3 boss — ROCKET MAN X: black tee, swept hair, smirking
+    const rocket = { w: 46, h: 62, skin: '#dcb394', hair: '#2b2118', hairStyle: 'wave', outfit: 'tee',
+                     suit: '#1d1f24', tie: '#1d1f24', pants: '#20242c', eye: '#2a2118',
+                     brow: '#1a140e', shoe: '#101216' };
+    makeChar(this, 'rocket0', { ...rocket, frame: 0 });
+    makeChar(this, 'rocket1', { ...rocket, frame: 1 });
+
+    // Vault boss — THE GOLDEN IDOL, the gilded statue that guards the money
+    const idol = { w: 46, h: 62, skin: '#d9a521', hair: '#ffe27a', hairStyle: 'swoop', suit: '#8c6a14',
+                   tie: '#d21f1f', pants: '#6b500f', eye: '#ffffff', brow: '#7a5810' };
     makeChar(this, 'idol0', { ...idol, frame: 0 });
     makeChar(this, 'idol1', { ...idol, frame: 1 });
 
@@ -413,6 +448,7 @@ class BootScene extends Phaser.Scene {
     this.anims.create({ key: 'obama-run', frames: [{ key: 'obama0' }, { key: 'obama1' }], frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'robo-run', frames: [{ key: 'robo0' }, { key: 'robo1' }], frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'idol-run', frames: [{ key: 'idol0' }, { key: 'idol1' }], frameRate: 5, repeat: -1 });
+    this.anims.create({ key: 'rocket-run', frames: [{ key: 'rocket0' }, { key: 'rocket1' }], frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'car-roll', frames: [{ key: 'car0' }, { key: 'car1' }], frameRate: 14, repeat: -1 });
 
     this.scene.start('Title');

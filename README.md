@@ -131,9 +131,9 @@ the way A Link to the Past does.
 ## Stages
 
 1. **City** — 8-bit classic styling. Boss: `BARACK O.` (10 HP)
-2. **Neon** — enhanced tech styling, new moves. Boss: `OMEGA AGENT` (16 HP)
-3. **Marble** — dawn over a gilded capitol. Boss: `THE GOLDEN IDOL` (22 HP)
-4. **THE VAULT** — top-down dungeon. Boss: a second Golden Idol (20 HP)
+2. **Neon** — enhanced tech styling, new moves. Boss: `THE ZUCKSTER` (16 HP)
+3. **Marble** — dawn over a gilded capitol. Boss: `ROCKET MAN X` (22 HP)
+4. **THE VAULT** — top-down dungeon. Boss: `THE GOLDEN IDOL` (20 HP)
 
 ## How it's built
 
