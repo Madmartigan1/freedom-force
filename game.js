@@ -578,7 +578,7 @@ class GameScene extends Phaser.Scene {
     this.chargeStart = 0; this.kickCdUntil = 0;
     this.padJumpPrev = false; this.padStartPrev = false; this.padSlidePrev = false; this.padKickPrev = false;
     this.bossStarted = false;
-    this.riding = false; this.carriage = null; this.ramCdUntil = 0;
+    this.riding = false; this.carriage = null; this.ramCdUntil = 0; this.mountCdUntil = 0;
     this.weapon = 'normal';
     this.big = false; this.bigUntil = 0;
 
@@ -1169,8 +1169,9 @@ class GameScene extends Phaser.Scene {
     this.riding = false;
     p.body.enable = true;
     p.setVisible(true);
-    p.setPosition(c.x - this.facing * 10, c.y - 26);
-    p.setVelocity(ejected ? -this.facing * 90 : 0, ejected ? -240 : -120);
+    p.setPosition(c.x - this.facing * 30, c.y - 34);
+    p.setVelocity(ejected ? -this.facing * 90 : -this.facing * 70, ejected ? -240 : -170);
+    this.mountCdUntil = this.time.now + 900;
     if (c.active) { c.stop(); c.setTexture('car0'); c.setVelocityX(0); }
     this.cameras.main.startFollow(p, true, 0.12, 0.12);
     if (ejected) this.invulnUntil = Math.max(this.invulnUntil, this.time.now + 1600);
@@ -1329,7 +1330,7 @@ class GameScene extends Phaser.Scene {
     this.beastHud.setVisible(!!riding);
     if (riding) {
       const a = this.carriage.armor;
-      this.beastHud.setText(`BEAST ${'\u2588'.repeat(a)}${'\u2591'.repeat(Math.max(0, CAR_ARMOR - a))}`);
+      this.beastHud.setText(`BEAST ${'\u2588'.repeat(a)}${'\u2591'.repeat(Math.max(0, CAR_ARMOR - a))}   V / Y  EJECT`);
       this.beastHud.setColor(a <= 2 ? '#ff5a3c' : a <= 4 ? '#ffd23a' : '#88ffaa');
     }
   }
@@ -1504,7 +1505,9 @@ class GameScene extends Phaser.Scene {
       const near = Math.abs(p.x - this.carriage.x) < CAR_MOUNT_RANGE && Math.abs(p.y - this.carriage.y) < 34;
       this.mountHint.setVisible(near);
       if (near) this.mountHint.setPosition(this.carriage.x, this.carriage.y - 26);
-      if (near && up) { this.mountCarriage(); return; }
+      // Stepping out leaves you standing in the trigger box, and UP is also the
+      // aim-up key, so without this cooldown ejecting re-mounts you instantly.
+      if (near && up && time > this.mountCdUntil) { this.mountCarriage(); return; }
     }
 
     if (this.riding) {
