@@ -29,11 +29,13 @@ however good it is otherwise.
 - **No runtime dependencies beyond Phaser**, which is vendored in `vendor/` on
   purpose so the game plays offline and does not depend on a CDN staying up.
   Please don't replace it with a CDN link.
-- **No asset files.** Every sprite is drawn at runtime with canvas calls; every
-  sound is synthesised from oscillators and filtered noise. No PNGs, no sprite
-  sheets, no audio files. This is the most unusual rule here and the one most
-  worth preserving — it means the repo is small, has nothing to lose track of,
-  and will still run in ten years.
+- **No asset files the game loads.** Every sprite is drawn at runtime with
+  canvas calls; every sound is synthesised from oscillators and filtered noise.
+  No PNGs, no sprite sheets, no audio files. This is the most unusual rule here
+  and the one most worth preserving — it means the repo is small, has nothing
+  to lose track of, and will still run in ten years. Documentation images under
+  `docs/` are the one exception: the game never loads them, so they cost
+  nothing at runtime. Keep them small.
 - **It stays a small parody game.** New stages want a reason beyond "one more" —
   a mechanic, a set piece, a joke that needs the room.
 

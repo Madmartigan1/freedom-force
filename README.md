@@ -6,7 +6,15 @@ of public figures.
 
 **▶ [Play it in your browser](https://madmartigan1.github.io/freedom-force/)**
 
-Runs in a browser. No build step, no install, no network.
+![Operation: Freedom Force — the title screen, riding THE BEAST, the Golden Idol boss fight, and a room inside THE VAULT](docs/screenshot.png)
+
+*Clockwise from top left: the title screen, THE BEAST mid-charge, a room in THE
+VAULT, and the Stage 3 boss. Shown with the CRT filter off — press `C` in game
+to turn it on.*
+
+Runs in a browser. No build step, no install, no network. Every sprite you can
+see and every sound you can hear is generated at runtime; there is not a single
+image or audio file in this repository.
 
 ## Play
 
@@ -158,8 +166,9 @@ is to let it become something else.
   a mechanic, a set piece, a joke that needs the room.
 - **No build step.** No bundler, no transpiler, no `npm install`. Editing `game.js` and
   hitting refresh stays the entire development loop.
-- **No external assets.** Sprites stay procedural and sound stays synthesised.
-  No image files, no sprite sheets, no audio files.
+- **No external assets the game loads.** Sprites stay procedural and sound stays
+  synthesised. No image files, no sprite sheets, no audio files. Screenshots in
+  `docs/` do not count — nothing at runtime touches them.
 - **No backend, accounts, or online play.** It is a local single-player game.
 - **Not a balanced competitive game.** It is a joke with good game feel.
 
