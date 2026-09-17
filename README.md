@@ -4,9 +4,15 @@ A Contra-style parody run-and-gun. Political satire in 16-bit dress: side-scroll
 stages, absurdly overwrought action-movie framing, and boss fights against caricatures
 of public figures.
 
+**▶ [Play it in your browser](https://madmartigan1.github.io/freedom-force/)**
+
 Runs in a browser. No build step, no install, no network.
 
 ## Play
+
+Easiest is the [hosted version](https://madmartigan1.github.io/freedom-force/).
+
+To run it locally:
 
 ```
 python3 -m http.server 8000
@@ -14,8 +20,11 @@ python3 -m http.server 8000
 
 Then open <http://localhost:8000>.
 
-Opening `index.html` directly with `file://` also mostly works, but a local server is
-the reliable path.
+Opening `index.html` directly with `file://` mostly works, but a local server is
+the reliable path — WebAudio and the Gamepad API both prefer a real origin.
+
+The title screen has a stage select: **1**-**3** for the side-scrolling stages,
+**4** to go straight to the dungeon.
 
 ## Controls
 
@@ -158,3 +167,16 @@ is to let it become something else.
 
 The `?v=6` cache-buster was dropped from the script tag when this entered version
 control; use a hard refresh if a change doesn't appear.
+
+## Contributing
+
+Issues and pull requests are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md)
+for how to run it and the few constraints worth knowing about (no build step,
+no asset files, and a load order that matters).
+
+## License
+
+[MIT](LICENSE). Phaser is vendored in `vendor/` and is MIT-licensed too.
+
+The game is political satire. The code is yours to do as you like with; the
+joke is its own business.
