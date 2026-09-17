@@ -587,9 +587,11 @@ class GameScene extends Phaser.Scene {
     CRT.apply(this);
 
     this.buildBackground(this.levelData.theme);
+    this.buildAtmosphere(this.levelData.theme);
 
     // ---- solids (ground + platforms) ----
-    const neon = this.levelData.theme === 'neon';
+    const theme = this.levelData.theme;
+    const neon = theme === 'neon';
     this.solids = this.add.group();
     this.addSolid(WORLD_W / 2, GROUND_TOP + 18, WORLD_W, 40, neon ? 0x1c1430 : 0x4a3320);
     // shaded ground surface drawn over the ground body (lit edge + soil + dither)
@@ -600,9 +602,31 @@ class GameScene extends Phaser.Scene {
     for (let x = 0; x < WORLD_W; x += 6) gsurf.fillRect(x + ((Math.floor(x / 6) % 2) ? 3 : 0), GROUND_TOP + 6, 3, 2);
     const platCol = neon ? 0x241a3a : 0x3a4152, platStroke = neon ? 0x27e0e0 : 0x5a6478;
     const platHi = neon ? 0x5affff : 0x8794a8;
+    // Platforms get theme-specific surface detail. They are on screen the whole
+    // time, so flat rectangles were the cheapest thing left dragging the look down.
+    const pg = this.add.graphics().setDepth(1);
     this.levelData.plats.forEach(pl => {
-      this.addSolid(pl[0], pl[1], pl[2], 14, platCol, platStroke);
-      this.add.rectangle(pl[0], pl[1] - 6, pl[2] - 2, 2, platHi).setDepth(1);   // lit top edge
+      const [px, py, pw] = pl;
+      this.addSolid(px, py, pw, 14, platCol, platStroke);
+      const L = px - pw / 2, T = py - 7;
+      pg.fillStyle(platHi, 1).fillRect(L + 1, T, pw - 2, 2);              // lit top edge
+      if (theme === 'marble') {
+        pg.fillStyle(0xc9921c, 1).fillRect(L + 1, T + 2, pw - 2, 1);      // gold inlay
+        pg.fillStyle(0x8f86a6, 0.9);
+        for (let v = L + 5; v < L + pw - 4; v += 11) pg.fillRect(v, T + 5, 4, 1);   // veining
+        pg.fillStyle(0x4f4860, 1).fillRect(L + 1, T + 12, pw - 2, 2);     // underside shadow
+      } else if (theme === 'neon') {
+        pg.fillStyle(0x27e0e0, 0.55);
+        for (let v = L + 4; v < L + pw - 3; v += 9) pg.fillRect(v, T + 4, 3, 1);    // circuit dashes
+        pg.fillStyle(0xff2fae, 0.8).fillRect(L + 1, T + 11, pw - 2, 1);   // underglow
+        pg.fillStyle(0x0d0718, 1).fillRect(L + 1, T + 12, pw - 2, 2);
+      } else {
+        pg.fillStyle(0x2c3444, 1);
+        for (let v = L + 4; v < L + pw - 3; v += 8) pg.fillRect(v, T + 5, 2, 4);    // grating slots
+        pg.fillStyle(0x8794a8, 1);
+        pg.fillRect(L + 2, T + 3, 1, 1); pg.fillRect(L + pw - 3, T + 3, 1, 1);      // rivets
+        pg.fillStyle(0x1b2230, 1).fillRect(L + 1, T + 12, pw - 2, 2);
+      }
     });
 
     // ---- groups ----
@@ -821,6 +845,58 @@ class GameScene extends Phaser.Scene {
         bld.fillStyle(0xffd97a, 1);
         for (let wy = GROUND_TOP - bh + 6; wy < GROUND_TOP - 6; wy += 12)
           for (let wx = x + 6; wx < x + 54; wx += 12) bld.fillRect(wx, wy, 5, 6);
+      }
+    }
+  }
+
+  // Screen-space weather, one layer per theme, drifting on its own tween. Sits
+  // in front of the parallax but behind everything that matters, and gets
+  // busier stage by stage so the game reads as climbing rather than reskinning.
+  buildAtmosphere(theme) {
+    const mk = (n, make) => { for (let i = 0; i < n; i++) make(i); };
+    if (theme === 'city') {
+      // dusk haze: slow motes catching the last light
+      mk(26, () => {
+        const x = Math.random() * GAME_W, y = 40 + Math.random() * 180;
+        const d = this.add.circle(x, y, Math.random() < 0.7 ? 1 : 2, 0xffd9a0, 0.22)
+          .setScrollFactor(0).setDepth(2);
+        this.tweens.add({ targets: d, x: x + 40 + Math.random() * 60, y: y - 20 - Math.random() * 30,
+          alpha: 0, duration: 5000 + Math.random() * 5000, repeat: -1, delay: Math.random() * 4000,
+          onRepeat: () => { d.x = -10; d.y = 40 + Math.random() * 180; d.alpha = 0.22; } });
+      });
+    } else if (theme === 'neon') {
+      // rain, plus sparks kicking off the wet ground
+      mk(60, () => {
+        const x = Math.random() * GAME_W, y = Math.random() * GAME_H;
+        const r = this.add.rectangle(x, y, 1, 7, 0x8fd9ff, 0.34).setScrollFactor(0).setDepth(2);
+        r.rotation = 0.18;
+        this.tweens.add({ targets: r, y: GAME_H + 10, x: x + 26,
+          duration: 620 + Math.random() * 420, repeat: -1, delay: Math.random() * 900,
+          onRepeat: () => { r.y = -10; r.x = Math.random() * GAME_W; } });
+      });
+      mk(10, () => {
+        const x = Math.random() * GAME_W;
+        const s = this.add.rectangle(x, GROUND_TOP - 2, 2, 2, 0xff2fae, 0.8).setScrollFactor(0).setDepth(3);
+        this.tweens.add({ targets: s, y: GROUND_TOP - 16 - Math.random() * 10, alpha: 0,
+          duration: 500 + Math.random() * 400, repeat: -1, delay: Math.random() * 2600,
+          onRepeat: () => { s.x = Math.random() * GAME_W; s.y = GROUND_TOP - 2; s.alpha = 0.8; } });
+      });
+    } else if (theme === 'marble') {
+      // gold embers rising, and shafts of dawn light
+      mk(34, () => {
+        const x = Math.random() * GAME_W, y = 120 + Math.random() * 130;
+        const e = this.add.circle(x, y, Math.random() < 0.6 ? 1 : 2, 0xffd23a, 0.55)
+          .setScrollFactor(0).setDepth(2);
+        this.tweens.add({ targets: e, y: y - 90 - Math.random() * 70, x: x + (Math.random() * 30 - 15),
+          alpha: 0, duration: 3200 + Math.random() * 2600, repeat: -1, delay: Math.random() * 3000,
+          onRepeat: () => { e.x = Math.random() * GAME_W; e.y = 120 + Math.random() * 130; e.alpha = 0.55; } });
+      });
+      for (let i = 0; i < 4; i++) {
+        const sx = 40 + i * 120;
+        const beam = this.add.rectangle(sx, 110, 26, 230, 0xffe9c4, 0.05)
+          .setScrollFactor(0.06).setDepth(1);
+        beam.rotation = -0.16;
+        this.tweens.add({ targets: beam, alpha: 0.11, duration: 2600 + i * 400, yoyo: true, repeat: -1 });
       }
     }
   }

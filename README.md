@@ -6,11 +6,11 @@ of public figures.
 
 **▶ [Play it in your browser](https://madmartigan1.github.io/freedom-force/)**
 
-![Operation: Freedom Force — the title screen, riding THE BEAST, the Golden Idol boss fight, and a room inside THE VAULT](docs/screenshot.png)
+![Operation: Freedom Force — BIG DONALD in the rain, the boss fights against THE ZUCKSTER and ROCKET MAN X, and a room inside THE VAULT](docs/screenshot.png)
 
-*Clockwise from top left: the title screen, THE BEAST mid-charge, a room in THE
-VAULT, and the Stage 3 boss. Shown with the CRT filter off — press `C` in game
-to turn it on.*
+*Clockwise from top left: BIG DONALD in the Stage 2 rain, THE ZUCKSTER, a room
+in THE VAULT, and ROCKET MAN X. Shown with the CRT filter off — press `C` in
+game to turn it on.*
 
 Runs in a browser. No build step, no install, no network. Every sprite you can
 see and every sound you can hear is generated at runtime; there is not a single
