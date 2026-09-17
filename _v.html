@@ -1,0 +1,39 @@
+<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#111;color:#ddd;font:12px monospace;padding:8px;white-space:pre}</style></head>
+<body><div id="o">…</div><div id="game" style="position:absolute;left:-9999px"></div>
+<script src="vendor/phaser-3.80.1.min.js"></script><script src="audio.js"></script><script src="crt.js"></script>
+<script>const R=Phaser.Game;window.__g=null;
+Phaser.Game=function(c){c.render=Object.assign({},c.render||{},{preserveDrawingBuffer:true});const g=new R(c);window.__g=g;return g;};
+Phaser.Game.prototype=R.prototype;
+const log=[];window.onerror=(m,s,l)=>log.push('ERR:'+m+'@'+l);</script>
+<script src="game.js"></script><script src="dungeon.js"></script><script src="main.js"></script>
+<script>
+const active=()=>window.__g.scene.getScenes(true).map(s=>s.scene.key).join(',');
+setTimeout(()=>{ window.__g.scene.stop('Title');
+  window.__g.scene.start('Dungeon',{score:1000,maxHearts:4,weapon:'laser'}); },900);
+setTimeout(()=>{ try{
+  const d=window.__g.scene.getScene('Dungeon');
+  // jump to the boss room and kill it, exactly as finishing the game would
+  d.room={col:1,row:0}; d.snapCamera(true); d.enterRoom();
+  const boss=d.enemies.getChildren().find(e=>e.isBoss);
+  log.push('boss found='+!!boss);
+  if(boss){ boss.hp=1; const b=d.pbullets.create(boss.x,boss.y,'pbullet'); b.dmg=5; d.hitEnemy(b,boss); }
+  log.push('won='+d.won+'  active scene='+active());
+}catch(e){log.push('a:'+e.message);} },1900);
+setTimeout(()=>{ try{
+  const d=window.__g.scene.getScene('Dungeon');
+  log.push('before R: won='+d.won+'  scene='+active());
+  // dispatch a genuine R keypress the way the browser would
+  window.dispatchEvent(new KeyboardEvent('keydown',{key:'r',code:'KeyR',keyCode:82,which:82,bubbles:true}));
+  log.push('R dispatched');
+}catch(e){log.push('b:'+e.message);} },2600);
+setTimeout(()=>{ log.push('after R: active scene='+active());
+  log.push('errors during transition: '+(log.some(l=>l.startsWith('ERR'))?'YES':'none'));
+  // now start a normal stage and confirm gravity came back
+  window.__g.scene.stop('Title'); window.__g.scene.start('Game',{level:1,score:0});
+  setTimeout(()=>{ const s=window.__g.scene.getScene('Game');
+    log.push('gravity in Stage 1 after the Vault = '+s.physics.world.gravity.y+(s.physics.world.gravity.y===900?'  (correct)':'  (BROKEN)'));
+    document.getElementById('o').textContent=log.join('\n'); },700);
+  window.dispatchEvent(new KeyboardEvent('keyup',{key:'r',code:'KeyR',keyCode:82,which:82,bubbles:true}));
+  },3200);
+</script><img src="/slow.png"></body></html>

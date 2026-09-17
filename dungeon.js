@@ -107,7 +107,11 @@ class DungeonScene extends Phaser.Scene {
     Sound.init();
     Sound.music(3);
     this.input.keyboard.on('keydown-M', () => Sound.toggleMute());
-    this.events.once('shutdown', () => { this.physics.world.gravity.y = 900; Sound.stopMusic(); });
+    // The world is already torn down by the time shutdown fires, so touching
+    // physics.world here throws and aborts the scene transition — which stranded
+    // the player on the VAULT CLEARED screen with no way out. Restoring gravity
+    // is GameScene's job on the way in; this only stops the music.
+    this.events.once('shutdown', () => { Sound.stopMusic(); });
 
     CRT.apply(this);
 

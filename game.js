@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 11;
+const BUILD = 12;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -638,6 +638,11 @@ class GameScene extends Phaser.Scene {
     this.weapon = 'normal';
     this.big = false; this.bigUntil = 0;
 
+    // Assert the gravity this scene needs rather than trusting another scene to
+    // have put it back. THE VAULT runs at zero g, and if its teardown is skipped
+    // for any reason every stage after it would float.
+    this.physics.world.gravity.y = 900;
+
     this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
 
     CRT.apply(this);
@@ -1235,6 +1240,7 @@ class GameScene extends Phaser.Scene {
     p.setVisible(false);
     c.play('car-roll');
     c.setFlipX(this.facing < 0);
+    this.ejectHintUntil = this.time.now + 2000;
     Sound.sfx('mount');
     this.cameras.main.startFollow(c, true, 0.12, 0.12);
     this.spark(c.x, c.y, 0xffe27a, 16);
@@ -1337,7 +1343,10 @@ class GameScene extends Phaser.Scene {
     // keep the hidden player glued on for camera/bookkeeping
     p.setPosition(c.x, c.y - 6);
 
-    this.ejectHint.setVisible(true).setPosition(c.x, c.y - 30);
+    // Prominent for a couple of seconds, then it stops cluttering the screen.
+    // The armour line in the HUD keeps 'V / Y EJECT' for the rest of the ride.
+    if (time < this.ejectHintUntil) this.ejectHint.setVisible(true).setPosition(c.x, c.y - 30);
+    else this.ejectHint.setVisible(false);
 
     // exhaust
     if (Math.abs(cb.velocity.x) > 40 && Math.floor(time / 90) % 2 === 0)
