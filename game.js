@@ -18,7 +18,20 @@ const CHARGE_TIME = 600;               // ms held for a full charge shot
 // timed state rather than a permanent upgrade so it stays a moment, not a mode.
 const BIG_TIME = 13000;                // ms at full size
 const BIG_WARN = 3000;                 // ms of flashing before it runs out
-const BIG_SCALE = 1.85;
+// The big sprite is drawn at these dimensions rather than scaled up. Body
+// proportions match the small one exactly: 12/20 wide, 26/28 tall, bottom-aligned,
+// which is what keeps his feet on the floor.
+const BIG_W = 38, BIG_H = 52;
+const BIG_BODY_W = Math.round(12 / 20 * BIG_W);      // 23
+const BIG_BODY_H = Math.round(26 / 28 * BIG_H);      // 48
+const BIG_OFF_X = Math.round((BIG_W - BIG_BODY_W) / 2);
+const BIG_OFF_Y = BIG_H - BIG_BODY_H;
+// With origin 0.5 and scale 1, a body whose offset+height equals the frame
+// height has its bottom exactly on the sprite's bottom, i.e. h/2 below centre.
+// Swapping sprites therefore needs the centre moved by the difference, or the
+// feet jump. Reading body.bottom to work this out does not survive the swap:
+// it only refreshes on the next physics step.
+const BIG_RISE = (BIG_H / 2) - (28 / 2);
 const BIG_DMG = 3;                     // bullets hit this hard while huge
 const BIG_STOMP_DROP = 60;             // fall speed that counts as a stomp
 
@@ -386,6 +399,12 @@ class BootScene extends Phaser.Scene {
     makeChar(this, 'trump0', { ...trump, frame: 0 });
     makeChar(this, 'trump1', { ...trump, frame: 1 });
 
+    // BIG DONALD is a separately drawn sprite, not a scaled one. Scaling the
+    // transform desynced the physics body from the drawn feet and left him
+    // hovering; at scale 1 the body maths is the same as every other character.
+    makeChar(this, 'trumpbig0', { ...trump, w: BIG_W, h: BIG_H, frame: 0 });
+    makeChar(this, 'trumpbig1', { ...trump, w: BIG_W, h: BIG_H, frame: 1 });
+
     const grunt = { w: 20, h: 28, skin: '#c98a5a', hair: '#2b2b2b', hairStyle: 'short', suit: '#3c4a28', tie: '#3c4a28', pants: '#2e3a20' };
     makeChar(this, 'grunt0', { ...grunt, frame: 0 });
     makeChar(this, 'grunt1', { ...grunt, frame: 1 });
@@ -480,6 +499,7 @@ class BootScene extends Phaser.Scene {
     g.destroy();
 
     this.anims.create({ key: 'trump-run', frames: [{ key: 'trump0' }, { key: 'trump1' }], frameRate: 10, repeat: -1 });
+    this.anims.create({ key: 'trumpbig-run', frames: [{ key: 'trumpbig0' }, { key: 'trumpbig1' }], frameRate: 9, repeat: -1 });
     this.anims.create({ key: 'grunt-run', frames: [{ key: 'grunt0' }, { key: 'grunt1' }], frameRate: 8, repeat: -1 });
     this.anims.create({ key: 'obama-run', frames: [{ key: 'obama0' }, { key: 'obama1' }], frameRate: 6, repeat: -1 });
     this.anims.create({ key: 'robo-run', frames: [{ key: 'robo0' }, { key: 'robo1' }], frameRate: 6, repeat: -1 });
@@ -652,7 +672,20 @@ class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.ebullets, this.solids, b => this.killBullet(b));
     this.physics.add.overlap(this.pbullets, this.enemies, (b, e) => this.hitEnemy(b, e));
     this.physics.add.overlap(this.ebullets, this.player, (pl, b) => { this.killBullet(b); this.damagePlayer(); });
-    this.physics.add.overlap(this.enemies, this.player, () => this.damagePlayer());
+    this.physics.add.overlap(this.enemies, this.player, (a, b) => {
+      // Phaser does not guarantee the callback argument order matches the order
+      // the groups were passed in, so pick the enemy explicitly. Taking the first
+      // argument on faith destroyed the player instead of the grunt.
+      const e = (a === this.player) ? b : a;
+      // Walking into a grunt while huge should flatten it, not cost you time.
+      if (this.big && e && e.active && !e.isBoss) {
+        this.spark(e.x, e.y, 0xffc14d, 12);
+        e.destroy(); this.score += 200; this.updateHud();
+        Sound.sfx('explode');
+        return;
+      }
+      this.damagePlayer();
+    });
 
     // ---- grunts ----
     this.levelData.grunts.forEach(s => this.spawnGrunt(s[0], s[1]));
@@ -1039,10 +1072,10 @@ class GameScene extends Phaser.Scene {
     const first = !this.big;
     this.big = true;
     this.bigUntil = this.time.now + BIG_TIME;          // re-eating refreshes the clock
-    p.setScale(BIG_SCALE);
-    // Grow the body about its feet so he does not end up standing inside the floor.
-    p.body.setSize(12 * BIG_SCALE, 26 * BIG_SCALE).setOffset(4, 2);
-    p.y -= first ? 14 : 0;
+    p.setScale(1);
+    p.setTexture('trumpbig0');
+    p.body.setSize(BIG_BODY_W, BIG_BODY_H).setOffset(BIG_OFF_X, BIG_OFF_Y);
+    if (first) p.y -= BIG_RISE;                        // grow upward; feet stay put
     this.cameras.main.shake(260, 0.010);
     this.cameras.main.flash(180, 255, 210, 90);
     this.spark(p.x, p.y, 0xffd23a, 22);
@@ -1055,7 +1088,9 @@ class GameScene extends Phaser.Scene {
     const p = this.player;
     this.big = false; this.bigUntil = 0;
     p.setScale(1);
+    p.setTexture('trump0');
     p.body.setSize(12, 26).setOffset(4, 2);
+    p.y += BIG_RISE;                                   // shrink about the feet too
     p.clearTint();
     this.spark(p.x, p.y, 0xaaaaaa, 12);
     Sound.sfx('shrink');
@@ -1296,8 +1331,15 @@ class GameScene extends Phaser.Scene {
   damagePlayer() {
     if (this.riding) { this.damageCarriage(); return; }
     if (this.big) {
-      // Huge means untouchable by bodies; being shot still costs the timer.
-      this.bigUntil = Math.max(this.time.now, this.bigUntil - 1800);
+      // Huge means untouchable by bodies, but a hit still costs time. This has to
+      // honour i-frames: overlap fires every frame, and ungated it drained all
+      // thirteen seconds in about seven frames of touching one grunt.
+      if (this.time.now < this.invulnUntil) return;
+      this.invulnUntil = this.time.now + 700;
+      this.bigUntil = Math.max(this.time.now, this.bigUntil - 1500);
+      this.spark(this.player.x, this.player.y, 0xffd23a, 8);
+      Sound.sfx('hit');
+      this.updateHud();
       return;
     }
     if (this.time.now < this.invulnUntil || this.gameOverFlag || this.won || this.sliding) return;
@@ -1525,7 +1567,7 @@ class GameScene extends Phaser.Scene {
 
     // ---- BIG DONALD upkeep ----
     if (this.big) {
-      const left = this.bigUntil - time;
+      const left = this.bigUntil - this.time.now;
       if (left <= 0) this.endBig();
       else {
         // flash a warning over the last few seconds so it never just vanishes
@@ -1552,7 +1594,7 @@ class GameScene extends Phaser.Scene {
         this.sliding = false; p.setScale(1, 1);
       } else {
         p.setVelocityX(this.facing * SLIDE_SPEED);
-        p.stop(); p.setTexture('trump0'); p.setRotation(0);
+        p.stop(); p.setTexture(this.big ? 'trumpbig0' : 'trump0'); p.setRotation(0);
         p.setAlpha(0.4);                    // transparent + intangible dash
       }
     } else {
@@ -1569,10 +1611,11 @@ class GameScene extends Phaser.Scene {
       // ----- animation + Contra somersault -----
       if (onGround) {
         if (this.jumping && pb.velocity.y >= 0) { this.jumping = false; p.setRotation(0); }
-        if (pb.velocity.x !== 0) { if (p.anims.currentAnim?.key !== 'trump-run') p.play('trump-run'); }
-        else { p.stop(); p.setTexture('trump0'); }
+        const runKey = this.big ? 'trumpbig-run' : 'trump-run';
+        if (pb.velocity.x !== 0) { if (p.anims.currentAnim?.key !== runKey) p.play(runKey); }
+        else { p.stop(); p.setTexture(this.big ? 'trumpbig0' : 'trump0'); }
       } else {
-        p.stop(); p.setTexture('trump1');
+        p.stop(); p.setTexture(this.big ? 'trumpbig1' : 'trump1');
         if (this.jumping) p.rotation += this.facing * SPIN_SPEED * (delta / 1000);
         else p.setRotation(0);
       }

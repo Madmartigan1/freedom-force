@@ -112,7 +112,8 @@ enormous for thirteen seconds.
 - **Nearly twice the size**, and shots hit for 3 instead of 1.
 - **Bodies cannot hurt you.** Getting shot does not cost a heart either — it
   takes time off the clock instead.
-- **Landing hard flattens whatever is underneath**, cracked blocks included.
+- **Landing hard flattens whatever is underneath**, cracked blocks included,
+  and simply walking into a grunt squashes it.
 - He flashes for the last three seconds so it never just runs out on you, and
   eating another burger refreshes the clock.
 
