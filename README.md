@@ -44,7 +44,7 @@ The title screen has a stage select: **1**-**3** for the side-scrolling stages,
 | Slide   | Down + Jump           | Down + A        |
 | Kick    | V                     | Y               |
 | Ride    | Up (next to THE BEAST)| Up / D-pad Up   |
-| Eject   | V                     | Y               |
+| Eject   | V *or* Down+Jump      | Y *or* Down+A   |
 | Restart | R                     | —               |
 | Mute    | M                     | —               |
 | CRT on/off | C                  | —               |
@@ -128,8 +128,9 @@ to climb aboard.
   and throws the Donald clear with mercy-invincibility.
 - **Cannon** — heavy shells, 3× a normal bullet's damage, angled with up/down.
 - **Ram** — flattens grunts on contact, staggers a boss.
-- Faster than running, with a heavier jump. **V / Y** to step out; it keeps whatever
-  armour is left, so you can come back for it.
+- Faster than running, with a heavier jump. **V / Y** or **Down+Jump** to step
+  out; it keeps whatever armour is left, so you can come back for it. A prompt
+  floats above the carriage the whole time you are aboard.
 
 ## THE VAULT
 

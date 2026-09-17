@@ -735,6 +735,11 @@ class GameScene extends Phaser.Scene {
     // ---- THE BEAST ----
     this.mountHint = this.add.text(0, 0, '\u25b2 UP TO RIDE', { fontFamily: 'monospace', fontSize: '8px', color: '#ffd23a' })
       .setOrigin(0.5).setDepth(20).setVisible(false);
+    // The eject prompt follows the carriage. A corner of the HUD was not enough:
+    // while driving you are looking at the vehicle, not at the status line.
+    this.ejectHint = this.add.text(0, 0, 'V / Y  or  DOWN+JUMP  TO GET OUT',
+      { fontFamily: 'monospace', fontSize: '8px', color: '#ffd23a', backgroundColor: '#00000088', padding: { x: 3, y: 1 } })
+      .setOrigin(0.5).setDepth(21).setVisible(false);
     if (this.levelData.carriage) this.spawnCarriage(this.levelData.carriage);
 
     // ---- input ----
@@ -1202,6 +1207,7 @@ class GameScene extends Phaser.Scene {
   dismountCarriage(ejected) {
     const p = this.player, c = this.carriage;
     this.riding = false;
+    this.ejectHint.setVisible(false);
     p.body.enable = true;
     p.setVisible(true);
     p.setPosition(c.x - this.facing * 30, c.y - 34);
@@ -1227,6 +1233,7 @@ class GameScene extends Phaser.Scene {
 
   explodeCarriage() {
     const c = this.carriage;
+    this.ejectHint.setVisible(false);
     this.spark(c.x, c.y, 0xffe27a, 26);
     this.spark(c.x, c.y - 6, 0xff5a3c, 20);
     this.cameras.main.shake(320, 0.012);
@@ -1281,11 +1288,14 @@ class GameScene extends Phaser.Scene {
     if (inp.up) ay = -0.55; else if (inp.down && !onGround) ay = 0.55;
     if (inp.shootHeld && time > this.nextShot) { this.nextShot = time + CAR_FIRE_CD; this.fireCannon(ay); }
 
-    // eject
-    if (inp.kickPressed) { this.dismountCarriage(false); return; }
+    // Eject. Two bindings on purpose: V/Y, and DOWN+JUMP, which is the same
+    // shape as the slide and is what people reach for to get out of a vehicle.
+    if (inp.kickPressed || (inp.down && inp.jumpJustPressed)) { this.dismountCarriage(false); return; }
 
     // keep the hidden player glued on for camera/bookkeeping
     p.setPosition(c.x, c.y - 6);
+
+    this.ejectHint.setVisible(true).setPosition(c.x, c.y - 30);
 
     // exhaust
     if (Math.abs(cb.velocity.x) > 40 && Math.floor(time / 90) % 2 === 0)
