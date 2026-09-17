@@ -13,6 +13,15 @@ const SLIDE_SPEED = 260, SLIDE_TIME = 420, SLIDE_CD = 260;  // ms
 const KICK_CD = 360, KICK_RANGE = 24;
 const CHARGE_TIME = 600;               // ms held for a full charge shot
 
+// ---------- BIG DONALD ----------
+// Bonk's Adventure by way of a drive-thru: eat the burger, get huge. Big is a
+// timed state rather than a permanent upgrade so it stays a moment, not a mode.
+const BIG_TIME = 13000;                // ms at full size
+const BIG_WARN = 3000;                 // ms of flashing before it runs out
+const BIG_SCALE = 1.85;
+const BIG_DMG = 3;                     // bullets hit this hard while huge
+const BIG_STOMP_DROP = 60;             // fall speed that counts as a stomp
+
 // ---------- health ----------
 // Hearts replace the old three-lives model: a hit chips one heart instead of
 // ending a life outright. Heart containers permanently raise the maximum and
@@ -53,7 +62,8 @@ const LEVELS = [
     carriage: 900,
     pickups: [[620, 200, 'machine'], [1480, 130, 'spread'], [2380, 132, 'laser']],
     // secret: [x, y, reward] — a cracked block hiding something
-    secrets: [[1150, 214, 'heartc'], [1960, 214, 'heart'], [2740, 130, 'laser']],
+    secrets: [[1150, 214, 'heartc'], [1960, 214, 'heart'], [2740, 130, 'burger']],
+    burgers: [[1720, 196]],
     ledges: [[1930, 160, 70], [2710, 158, 64]],
   },
   {
@@ -65,7 +75,8 @@ const LEVELS = [
     boss: { key: 'robo', name: 'THE ZUCKSTER', hp: 16 },
     carriage: 760,
     pickups: [[520, 200, 'spread'], [1260, 130, 'laser'], [2180, 126, 'machine']],
-    secrets: [[880, 214, 'heartc'], [1720, 214, 'heart'], [2560, 128, 'spread']],
+    secrets: [[880, 214, 'heartc'], [1720, 214, 'heart'], [2560, 128, 'burger']],
+    burgers: [[1480, 196]],
     ledges: [[2530, 158, 70]],
   },
   {
@@ -78,7 +89,8 @@ const LEVELS = [
     boss: { key: 'rocket', name: 'ROCKET MAN X', hp: 22 },
     carriage: 620,
     pickups: [[430, 200, 'laser'], [1200, 126, 'machine'], [2360, 170, 'spread'], [2880, 166, 'laser']],
-    secrets: [[760, 214, 'heartc'], [1640, 214, 'heart'], [2240, 214, 'heart'], [3000, 126, 'machine']],
+    secrets: [[760, 214, 'heartc'], [1640, 214, 'heart'], [2240, 214, 'burger'], [3000, 126, 'machine']],
+    burgers: [[1020, 196], [2620, 196]],
     ledges: [[2970, 156, 70]],
   },
 ];
@@ -281,6 +293,28 @@ function makeCrackedBlock(scene, key, base, edge, crack) {
   tex.refresh();
 }
 
+// ---------- the burger ----------
+function makeBurger(scene, key) {
+  const W = 20, H = 16;
+  const tex = scene.textures.createCanvas(key, W, H);
+  const c = tex.context;
+  const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  R(3, 2, 14, 4, '#d9922f');            // top bun
+  R(3, 2, 14, 1, '#f2b75c');
+  R(2, 3, 1, 3, '#b8761f'); R(17, 3, 1, 3, '#b8761f');
+  R(6, 3, 2, 1, '#ffe9c4'); R(11, 4, 2, 1, '#ffe9c4');   // sesame
+  R(9, 3, 1, 1, '#ffe9c4');
+  R(2, 6, 16, 2, '#4faa3c');            // lettuce
+  R(3, 6, 2, 1, '#77d45e'); R(9, 7, 3, 1, '#3d8a2f');
+  R(3, 8, 14, 3, '#7a3b1e');            // patty
+  R(3, 8, 14, 1, '#96512c');
+  R(2, 11, 16, 2, '#e8c33a');           // cheese, drooping
+  R(4, 13, 3, 1, '#e8c33a'); R(13, 13, 3, 1, '#e8c33a');
+  R(3, 13, 14, 2, '#c98a33');           // bottom bun
+  R(3, 14, 14, 1, '#9c6520');
+  tex.refresh();
+}
+
 // ---------- hearts ----------
 const HEART_PX = [
   '.11.11.',
@@ -404,6 +438,8 @@ class BootScene extends Phaser.Scene {
     makeCrackedBlock(this, 'brk_city',   '#4a3f52', '#6d6080', '#241c2b');
     makeCrackedBlock(this, 'brk_neon',   '#241a3a', '#4a2f6e', '#0d0718');
     makeCrackedBlock(this, 'brk_marble', '#6d6480', '#b9b0cc', '#332e40');
+
+    makeBurger(this, 'burger');
 
     // hearts: small refill, large permanent container
     makeHeart(this, 'heart',  '#ff3b6a', '#5c0a1e', 2);
@@ -544,6 +580,7 @@ class GameScene extends Phaser.Scene {
     this.bossStarted = false;
     this.riding = false; this.carriage = null; this.ramCdUntil = 0;
     this.weapon = 'normal';
+    this.big = false; this.bigUntil = 0;
 
     this.input.keyboard.addCapture('SPACE,UP,DOWN,LEFT,RIGHT');
 
@@ -609,6 +646,7 @@ class GameScene extends Phaser.Scene {
     // hearts and containers share one group
     this.items = this.physics.add.group({ allowGravity: false });
     this.physics.add.overlap(this.player, this.items, (pl, it) => this.takeItem(it));
+    (this.levelData.burgers || []).forEach(([bx, by]) => this.spawnItem(bx, by, 'burger'));
 
     // ---- secret ledges: the only way to reach some hidden blocks ----
     (this.levelData.ledges || []).forEach(([lx, ly, lw]) => {
@@ -657,6 +695,7 @@ class GameScene extends Phaser.Scene {
     this.scoreHud = this.add.text(466, 6, '', { fontFamily: 'monospace', fontSize: '10px', color: '#ffffff' }).setOrigin(1, 0).setScrollFactor(0).setDepth(50);
     this.beastHud = this.add.text(8, 238, '', { fontFamily: 'monospace', fontSize: '9px', color: '#88ffaa' }).setScrollFactor(0).setDepth(50).setVisible(false);
     this.weaponHud = this.add.text(8, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#ffffff' }).setScrollFactor(0).setDepth(50);
+    this.bigHud = this.add.text(466, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#ffd23a' }).setOrigin(1, 0).setScrollFactor(0).setDepth(50).setVisible(false);
     this.updateHud();
     this.bossBarBg = this.add.rectangle(GAME_W / 2, 14, 134, 9, 0x222222).setScrollFactor(0).setDepth(50).setStrokeStyle(1, 0xffffff).setVisible(false);
     this.bossBar = this.add.rectangle(GAME_W / 2 - 65, 14, 130, 5, 0xff3b3b).setOrigin(0, 0.5).setScrollFactor(0).setDepth(51).setVisible(false);
@@ -845,6 +884,7 @@ class GameScene extends Phaser.Scene {
     b.setVelocity(ax / len * spd, ay / len * spd);
     b.rotation = Math.atan2(ay, ax); b.setDepth(6);
     b.dmg = o.dmg || (charged ? 3 : 1);
+    if (this.big) { b.dmg = Math.max(b.dmg, BIG_DMG); b.setScale(1.6, 1.4); }
     if (o.tint) b.setTint(o.tint);
     if (o.pierce) b.pierce = true;
     if (o.scaleX) b.setScale(o.scaleX, 1);
@@ -874,7 +914,7 @@ class GameScene extends Phaser.Scene {
     Sound.sfx('break');
     this.secretsFound++;
 
-    if (reward === 'heart' || reward === 'heartc') this.spawnItem(rx, ry - 4, reward);
+    if (reward === 'heart' || reward === 'heartc' || reward === 'burger') this.spawnItem(rx, ry - 4, reward);
     else {
       const pod = this.pods.create(rx, ry - 4, 'pod_' + reward);
       pod.wtype = reward; pod.setDepth(6);
@@ -901,6 +941,9 @@ class GameScene extends Phaser.Scene {
       this.score += 500;
       this.flashBanner('HEART CONTAINER!', '#ffd23a');
       Sound.sfx('secret');
+    } else if (it.kind === 'burger') {
+      this.goBig();
+      this.score += 300;
     } else {
       if (this.hearts >= this.maxHearts) { this.score += 50; }
       else this.hearts++;
@@ -914,6 +957,58 @@ class GameScene extends Phaser.Scene {
 
   // Only ever one banner on screen. Breaking a block and grabbing what falls out
   // can land in the same frame, and two overlapping labels are unreadable.
+  // ---- BIG DONALD ----
+  goBig() {
+    const p = this.player;
+    const first = !this.big;
+    this.big = true;
+    this.bigUntil = this.time.now + BIG_TIME;          // re-eating refreshes the clock
+    p.setScale(BIG_SCALE);
+    // Grow the body about its feet so he does not end up standing inside the floor.
+    p.body.setSize(12 * BIG_SCALE, 26 * BIG_SCALE).setOffset(4, 2);
+    p.y -= first ? 14 : 0;
+    this.cameras.main.shake(260, 0.010);
+    this.cameras.main.flash(180, 255, 210, 90);
+    this.spark(p.x, p.y, 0xffd23a, 22);
+    Sound.sfx('big');
+    this.flashBanner('BIG DONALD!', '#ffd23a');
+    this.updateHud();
+  }
+
+  endBig() {
+    const p = this.player;
+    this.big = false; this.bigUntil = 0;
+    p.setScale(1);
+    p.body.setSize(12, 26).setOffset(4, 2);
+    p.clearTint();
+    this.spark(p.x, p.y, 0xaaaaaa, 12);
+    Sound.sfx('shrink');
+    this.invulnUntil = Math.max(this.invulnUntil, this.time.now + 900);   // brief grace on shrinking
+    this.updateHud();
+  }
+
+  // Landing hard while huge flattens anything underfoot.
+  bigStomp() {
+    const p = this.player;
+    let hit = false;
+    this.enemies.getChildren().forEach(e => {
+      if (!e.active) return;
+      if (Math.abs(e.x - p.x) > 30 || Math.abs(e.y - p.y) > 34) return;
+      hit = true;
+      if (e.isBoss) { this.hitBoss(e, 2); e.setVelocityY(-120); }
+      else { this.spark(e.x, e.y, 0xffc14d, 12); e.destroy(); this.score += 200; }
+    });
+    this.breakables.getChildren().forEach(b => {
+      if (b.active && Math.abs(b.x - p.x) < 34 && Math.abs(b.y - p.y) < 40) {
+        const bul = { dmg: 3, active: false, pierce: true };            // no bullet to consume
+        this.hitBreakable(bul, b);
+      }
+    });
+    this.cameras.main.shake(180, 0.008);
+    this.spark(p.x, p.y + 14, 0xdddddd, 14);
+    if (hit) { Sound.sfx('explode'); this.updateHud(); }
+  }
+
   flashBanner(text, color) {
     if (this._banner && this._banner.active) this._banner.destroy();
     const t = this.add.text(GAME_W / 2, 86, text,
@@ -974,6 +1069,7 @@ class GameScene extends Phaser.Scene {
   mountCarriage() {
     const p = this.player, c = this.carriage;
     this.riding = true;
+    if (this.big) this.endBig();          // one oversized hitbox at a time
     this.mountHint.setVisible(false);
     this.sliding = false; this.chargeStart = 0;
     p.setScale(1, 1).clearTint().setAlpha(1);
@@ -1122,6 +1218,11 @@ class GameScene extends Phaser.Scene {
 
   damagePlayer() {
     if (this.riding) { this.damageCarriage(); return; }
+    if (this.big) {
+      // Huge means untouchable by bodies; being shot still costs the timer.
+      this.bigUntil = Math.max(this.time.now, this.bigUntil - 1800);
+      return;
+    }
     if (this.time.now < this.invulnUntil || this.gameOverFlag || this.won || this.sliding) return;
     this.hearts--; this.updateHud();
     this.invulnUntil = this.time.now + 1300;
@@ -1137,6 +1238,11 @@ class GameScene extends Phaser.Scene {
     this.hud.setText(`STAGE ${this.level}  ${'\u2665'.repeat(h)}${'\u2661'.repeat(Math.max(0, this.maxHearts - h))}`);
     this.hud.setColor(h <= 1 ? '#ff3b3b' : h <= 2 ? '#ffd23a' : '#ff6a7a');
     this.scoreHud.setText(`SCORE ${this.score}`);
+    if (this.bigHud) {
+      const on = this.big && this.bigUntil > this.time.now;
+      this.bigHud.setVisible(!!on);
+      if (on) this.bigHud.setText(`BIG ${Math.ceil((this.bigUntil - this.time.now) / 1000)}s`);
+    }
     if (this.weaponHud) {
       const w = WEAPONS[this.weapon] || WEAPONS.normal;
       this.weaponHud.setText('\u2b24 ' + w.label);
@@ -1273,6 +1379,7 @@ class GameScene extends Phaser.Scene {
     this.gameOverFlag = false;
     this.hearts = this.maxHearts; this.updateHud();
     this.sliding = false; this.chargeStart = 0;
+    if (this.big) this.endBig();
     this.player.setScale(1, 1).clearTint().setAlpha(1).setVelocity(0, 0);
     this.invulnUntil = this.time.now + 2000;
     this.physics.resume();
@@ -1336,6 +1443,19 @@ class GameScene extends Phaser.Scene {
       if (pb.right > this.arenaMaxX) { pb.x = this.arenaMaxX - pb.width; if (pb.velocity.x > 0) pb.velocity.x = 0; }
     }
     const onGround = pb.blocked.down || pb.touching.down || clampedGround;
+
+    // ---- BIG DONALD upkeep ----
+    if (this.big) {
+      const left = this.bigUntil - time;
+      if (left <= 0) this.endBig();
+      else {
+        // flash a warning over the last few seconds so it never just vanishes
+        if (left < BIG_WARN) p.setTint((Math.floor(time / 110) % 2) ? 0xffffff : 0xffd23a);
+        else p.setTint(0xffe9a8);
+        if (onGround && this.bigFallSpeed > BIG_STOMP_DROP) this.bigStomp();
+      }
+    }
+    this.bigFallSpeed = onGround ? 0 : pb.velocity.y;
 
     // ---- Mega Man-style slide: hold DOWN + press JUMP (Stage 2) ----
     if (this.enhanced && down && jumpJustPressed && onGround && !this.sliding && time > this.slideCdUntil) {
@@ -1422,6 +1542,8 @@ class GameScene extends Phaser.Scene {
     }
 
     }   // end on-foot branch
+
+    if (this.big) this.updateHud();
 
     // ---- enemies ----
     this.enemies.getChildren().forEach(e => {

@@ -103,6 +103,21 @@ scheduler, so timing does not drift with the frame rate.
 Browsers refuse to start an AudioContext before a user gesture, so audio arms
 itself on the first keypress or button. **M** mutes.
 
+## BIG DONALD
+
+Somewhere in every stage there is a burger — one in the open, one behind a
+cracked block. Eat it and, in the spirit of Bonk's Adventure, the Donald gets
+enormous for thirteen seconds.
+
+- **Nearly twice the size**, and shots hit for 3 instead of 1.
+- **Bodies cannot hurt you.** Getting shot does not cost a heart either — it
+  takes time off the clock instead.
+- **Landing hard flattens whatever is underneath**, cracked blocks included.
+- He flashes for the last three seconds so it never just runs out on you, and
+  eating another burger refreshes the clock.
+
+Mounting THE BEAST ends it early — one oversized hitbox at a time.
+
 ## THE BEAST
 
 Partway into every stage sits a gilded armoured carriage. Walk up and press **Up**
