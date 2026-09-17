@@ -13,6 +13,34 @@ const SLIDE_SPEED = 260, SLIDE_TIME = 420, SLIDE_CD = 260;  // ms
 const KICK_CD = 360, KICK_RANGE = 24;
 const CHARGE_TIME = 600;               // ms held for a full charge shot
 
+// ---------- gamepad directions ----------
+// Not every pad reports its d-pad the same way. Phaser's pad.up/down/left/right
+// only work when the browser applies the standard mapping, which puts the d-pad
+// on buttons 12-15. Plenty of pads — the PowerA wired Xbox pads among them —
+// expose it as a hat axis instead, and then those properties are never true.
+// Read all three sources: the named props, buttons 12-15, the left stick, and a
+// hat axis if one is present.
+const PAD_DZ = 0.35;
+function padAxis(pad, i) {
+  const a = pad.axes && pad.axes[i];
+  if (!a) return 0;
+  return (typeof a.getValue === 'function') ? a.getValue() : (typeof a === 'number' ? a : 0);
+}
+function padDir(pad) {
+  if (!pad) return { up: false, down: false, left: false, right: false };
+  const b = pad.buttons || [];
+  const btn = (i) => !!(b[i] && b[i].pressed);
+  const sx = pad.leftStick ? pad.leftStick.x : 0;
+  const sy = pad.leftStick ? pad.leftStick.y : 0;
+  const hx = padAxis(pad, 6), hy = padAxis(pad, 7);      // hat, when exposed as axes
+  return {
+    up:    !!pad.up    || btn(12) || sy < -PAD_DZ || hy < -0.5,
+    down:  !!pad.down  || btn(13) || sy >  PAD_DZ || hy >  0.5,
+    left:  !!pad.left  || btn(14) || sx < -PAD_DZ || hx < -0.5,
+    right: !!pad.right || btn(15) || sx >  PAD_DZ || hx >  0.5,
+  };
+}
+
 // ---------- BIG DONALD ----------
 // Bonk's Adventure by way of a drive-thru: eat the burger, get huge. Big is a
 // timed state rather than a permanent upgrade so it stays a moment, not a mode.
@@ -528,7 +556,7 @@ class TitleScene extends Phaser.Scene {
     this.add.text(cx, 238, 'KEYBOARD: ARROWS/WASD · SPACE jump · X shoot · DOWN+JUMP slide · V kick · M mute', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
     this.add.text(cx, 250, 'XBOX PAD:  STICK/D-PAD · A jump · X shoot · DOWN+A slide · Y kick · START', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
     if (CRT.available()) {
-      this.add.text(cx, 262, 'C  toggle CRT filter', { fontFamily: 'monospace', fontSize: '8px', color: '#6f7d92' }).setOrigin(0.5);
+      this.add.text(cx, 262, 'C  toggle CRT filter      P  gamepad readout', { fontFamily: 'monospace', fontSize: '8px', color: '#6f7d92' }).setOrigin(0.5);
     }
     CRT.apply(this);
 
@@ -758,6 +786,12 @@ class GameScene extends Phaser.Scene {
     this.beastHud = this.add.text(8, 238, '', { fontFamily: 'monospace', fontSize: '9px', color: '#88ffaa' }).setScrollFactor(0).setDepth(50).setVisible(false);
     this.weaponHud = this.add.text(8, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#ffffff' }).setScrollFactor(0).setDepth(50);
     this.bigHud = this.add.text(466, 250, '', { fontFamily: 'monospace', fontSize: '9px', color: '#ffd23a' }).setOrigin(1, 0).setScrollFactor(0).setDepth(50).setVisible(false);
+
+    // P toggles a readout of exactly what the pad is reporting. Controllers vary
+    // enough in how they expose a d-pad that guessing from a bug report is slow.
+    this.padDebug = this.add.text(8, 30, '', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa', backgroundColor: '#000000aa', padding: { x: 3, y: 2 } })
+      .setScrollFactor(0).setDepth(60).setVisible(false);
+    this.input.keyboard.on('keydown-P', () => this.padDebug.setVisible(!this.padDebug.visible));
     this.updateHud();
     this.bossBarBg = this.add.rectangle(GAME_W / 2, 14, 134, 9, 0x222222).setScrollFactor(0).setDepth(50).setStrokeStyle(1, 0xffffff).setVisible(false);
     this.bossBar = this.add.rectangle(GAME_W / 2 - 65, 14, 130, 5, 0xff3b3b).setOrigin(0, 0.5).setScrollFactor(0).setDepth(51).setVisible(false);
@@ -1521,11 +1555,8 @@ class GameScene extends Phaser.Scene {
 
     // ---- unified input: keyboard OR Xbox pad ----
     const pad = (this.input.gamepad && this.input.gamepad.total) ? this.input.gamepad.getPad(0) : null;
-    const sx = pad ? pad.leftStick.x : 0, sy = pad ? pad.leftStick.y : 0, DZ = 0.35;
-    const padLeft  = pad ? (pad.left  || sx < -DZ) : false;
-    const padRight = pad ? (pad.right || sx >  DZ) : false;
-    const padUp    = pad ? (pad.up    || sy < -DZ) : false;
-    const padDown  = pad ? (pad.down  || sy >  DZ) : false;
+    const dir = padDir(pad);
+    const padLeft = dir.left, padRight = dir.right, padUp = dir.up, padDown = dir.down;
     const padA     = pad ? pad.A : false;
     const padShoot = pad ? (pad.X || pad.B || pad.R1) : false;
     const padStart = pad ? !!(pad.buttons[9] && pad.buttons[9].pressed) : false;
@@ -1676,6 +1707,22 @@ class GameScene extends Phaser.Scene {
     }   // end on-foot branch
 
     if (this.big) this.updateHud();
+
+    if (this.padDebug.visible) {
+      if (!pad) this.padDebug.setText('no gamepad seen\n(click the page, press a button)');
+      else {
+        const b = pad.buttons || [];
+        const pressed = b.map((x, i) => (x && x.pressed) ? i : null).filter(i => i !== null);
+        const axes = (pad.axes || []).map((a, i) => i + ':' + padAxis(pad, i).toFixed(2)).join(' ');
+        this.padDebug.setText(
+          `pad: ${(pad.id || '?').slice(0, 30)}\n` +
+          `mapping=${pad.mapping || '(none)'}  buttons=${b.length} axes=${(pad.axes || []).length}\n` +
+          `pressed: [${pressed.join(',') || '-'}]\n` +
+          `axes: ${axes}\n` +
+          `resolved dir: up=${dir.up} down=${dir.down} left=${dir.left} right=${dir.right}\n` +
+          `A=${!!pad.A} Y=${!!pad.Y}   riding=${this.riding}  big=${this.big}`);
+      }
+    }
 
     // ---- enemies ----
     this.enemies.getChildren().forEach(e => {

@@ -398,11 +398,11 @@ class DungeonScene extends Phaser.Scene {
   update(time) {
     const k = this.keys, p = this.player;
     const pad = (this.input.gamepad && this.input.gamepad.total) ? this.input.gamepad.getPad(0) : null;
-    const sx = pad ? pad.leftStick.x : 0, sy = pad ? pad.leftStick.y : 0, DZ = 0.35;
-    const left  = k.left.isDown  || k.a.isDown || (pad && (pad.left  || sx < -DZ));
-    const right = k.right.isDown || k.d.isDown || (pad && (pad.right || sx >  DZ));
-    const up    = k.up.isDown    || k.w.isDown || (pad && (pad.up    || sy < -DZ));
-    const down  = k.down.isDown  || k.s.isDown || (pad && (pad.down  || sy >  DZ));
+    const dir = padDir(pad);
+    const left  = k.left.isDown  || k.a.isDown || dir.left;
+    const right = k.right.isDown || k.d.isDown || dir.right;
+    const up    = k.up.isDown    || k.w.isDown || dir.up;
+    const down  = k.down.isDown  || k.s.isDown || dir.down;
     const shoot = k.shoot.isDown || k.shoot2.isDown || (pad && (pad.X || pad.B || pad.R1));
     const act   = Phaser.Input.Keyboard.JustDown(k.jump) || (pad && pad.A && !this.padShootPrev);
     this.padShootPrev = pad ? pad.A : false;

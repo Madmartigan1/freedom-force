@@ -23,10 +23,11 @@ Easiest is the [hosted version](https://madmartigan1.github.io/freedom-force/).
 To run it locally:
 
 ```
-python3 -m http.server 8000
+python3 serve.py
 ```
 
-Then open <http://localhost:8000>.
+Then open <http://localhost:8000>. (`serve.py` is `http.server` with caching
+disabled, so edits always show up on refresh.)
 
 Opening `index.html` directly with `file://` mostly works, but a local server is
 the reliable path — WebAudio and the Gamepad API both prefer a real origin.

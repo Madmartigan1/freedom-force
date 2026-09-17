@@ -11,10 +11,15 @@ There is no install step and no build step.
 ```
 git clone https://github.com/Madmartigan1/freedom-force.git
 cd freedom-force
-python3 -m http.server 8000
+python3 serve.py
 ```
 
 Open <http://localhost:8000>, edit a file, hit refresh. That's the whole loop.
+
+`serve.py` is plain `http.server` with caching switched off. Use it rather than
+`python3 -m http.server`: that only sends `Last-Modified`, so a browser will
+happily reuse a stale `game.js` on a normal reload and you end up testing code
+you already changed.
 
 Use a local server rather than opening `index.html` over `file://` — the
 WebAudio and Gamepad APIs both want a proper origin.
