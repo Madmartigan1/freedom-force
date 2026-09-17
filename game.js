@@ -5,6 +5,11 @@
 //  Phaser 3 · zero build step · procedural pixel-art sprites
 // =============================================================
 
+// Bump alongside the ?v= query in index.html whenever the scripts change. It is
+// printed on the title screen so "am I looking at a stale cached build?" is a
+// question you can answer by looking, rather than by guessing.
+const BUILD = 11;
+
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
 const BULLET_SPEED = 430, ENEMY_BULLET_SPEED = 165;
@@ -557,6 +562,9 @@ class TitleScene extends Phaser.Scene {
     this.add.text(cx, 250, 'XBOX PAD:  STICK/D-PAD · A jump · X shoot · DOWN+A slide · Y kick · START', { fontFamily: 'monospace', fontSize: '8px', color: '#88ffaa' }).setOrigin(0.5);
     if (CRT.available()) {
       this.add.text(cx, 262, 'C  toggle CRT filter      P  gamepad readout', { fontFamily: 'monospace', fontSize: '8px', color: '#6f7d92' }).setOrigin(0.5);
+    }
+    {
+      this.add.text(GAME_W - 6, 6, 'build ' + BUILD, { fontFamily: 'monospace', fontSize: '8px', color: '#4a5568' }).setOrigin(1, 0);
     }
     CRT.apply(this);
 
