@@ -192,8 +192,10 @@ is to let it become something else.
 
 ## Notes
 
-The `?v=6` cache-buster was dropped from the script tag when this entered version
-control; use a hard refresh if a change doesn't appear.
+Every script tag carries a `?v=` cache-buster that must match `BUILD` in
+`game.js`, and both go up whenever a script changes — without that, a returning
+browser will happily reuse the `game.js` it already has. The title screen shows
+the build it is running, so you can tell at a glance what you are looking at.
 
 ## Contributing
 
