@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 12;
+const BUILD = 13;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -159,15 +159,119 @@ function shbox(ctx, x, y, w, h, base) {
   ctx.fillStyle = shade(base, -34); ctx.fillRect(x, y + h - 1, w, 1); ctx.fillRect(x + w - 1, y, 1, h);
 }
 
+// ---------- face ----------
+// Faces are where fractions of the head box stop working. At ten pixels across
+// a feature placed on a fraction lands on a half pixel, rounds into its
+// neighbour, and the head reads as a flat slab with two holes punched in it.
+// So features here are given whole rows out of a budget measured off the head
+// box, never a fraction each: a head is eight rows tall on the small sprite,
+// and brow, eyes, nose, mouth and jaw only fit if each is told exactly which
+// rows it owns. An earlier pass let the nostril land on the mouth row and he
+// grew a walrus moustache.
+//
+// Detail steps up in one jump (s) rather than scaling smoothly, so the 20px
+// sprite and BIG DONALD wear the same face instead of one being a blurred
+// copy of the other.
+//
+//   look: 'plain' level mouth | 'scowl' pressed, corners down | 'smirk' one up
+//   tan:  pale skin around the eyes over a darker face
+function drawFace(ctx, hx, hy, hw, hh, o) {
+  const { skin, eye = '#20140a', brow = null, look = 'plain', tan = false } = o;
+  const R = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(w)), Math.max(1, Math.round(h))); };
+  const s = hw >= 16 ? 2 : 1;                       // feature thickness
+  const lit = shade(skin, 30), mid = shade(skin, -18), dark = shade(skin, -42), deep = shade(skin, -66);
+
+  // ---- rows ----
+  // Anchored on the eyes and spaced outward, with a blank row kept between the
+  // eyes and the nose and between the nose and the mouth. Those two gaps are
+  // the whole difference between a face and a smudge.
+  const eyeH  = s;
+  const eyeY  = hy + Math.round(hh * 0.36);
+  const browY = eyeY - s;
+  const noseY = eyeY + eyeH + (s > 1 ? 1 : 0);
+  const mouthY = Math.min(noseY + s + (s > 1 ? 1 : 0), hy + hh - s - (s > 1 ? 2 : 1));
+  const eyeW  = Math.max(2, Math.round(hw * 0.22));
+  const inset = Math.max(1, Math.round(hw * 0.17));
+  const lx = hx + inset, rx = hx + hw - inset - eyeW;
+
+  // ---- jaw ----
+  // Clipping the bottom corners is what stops the head reading as a brick;
+  // the rest of the face is wasted while the silhouette is a rectangle.
+  ctx.clearRect(hx, hy + hh - s, s, s);
+  ctx.clearRect(hx + hw - s, hy + hh - s, s, s);
+  R(hx + s, hy + hh - 1, hw - s * 2, 1, dark);                    // under-jaw
+  R(hx + hw - s, hy + s, s, hh - s * 2, mid);                     // far cheek, turned away
+  R(hx + 1, hy + s, 1, hh - s * 2 - 1, lit);                      // lit temple, near side
+  R(hx - 1, eyeY, 1, s + 1, shade(skin, -14));                    // ears break the straight sides
+  R(hx + hw, eyeY, 1, s + 1, shade(skin, -24));
+
+  // ---- eyes ----
+  // Sclera plus an offset pupil, rather than one dark block: the block is what
+  // made these read as C64 sprites. Pupils sit toward the facing side, so he
+  // looks where he is running.
+  const sclera = shade(skin, 66);
+  for (const ex of [lx, rx]) {
+    if (tan && s > 1) {                                           // pale ring: the tan line.
+      // Only at the larger size — at 10px across the two rings meet over the
+      // nose and the whole band goes pale.
+      const pale = shade(skin, 52);
+      R(ex - 1, eyeY, 1, eyeH + 1, pale);
+      R(ex + eyeW, eyeY, 1, eyeH + 1, pale);
+      R(ex - 1, eyeY + eyeH, eyeW + 2, 1, pale);
+    }
+    R(ex, eyeY, eyeW, eyeH, sclera);
+    R(ex + s, eyeY, eyeW - s, eyeH, eye);                         // pupil, facing side
+    if (s > 1) R(ex + s, eyeY, 1, 1, shade(eye, 104));            // catchlight
+    R(ex, browY + s - 1, eyeW, 1, dark);                          // hooded lid
+  }
+
+  // ---- brow ----
+  // Drawn even when no brow colour is given: an unbrowed face carries no
+  // expression at all, and the skin shadow alone is enough to sit a ridge
+  // over the eyes.
+  const bc = brow || dark;
+  R(lx - 1, browY, eyeW + 1, s, bc);
+  R(rx, browY, eyeW + 1, s, bc);
+  if (look === 'scowl') {                                         // drawn in and down
+    R(lx + eyeW, browY + s, s, 1, bc);
+    R(rx - 1, browY + s, s, 1, bc);
+  }
+
+  // ---- nose ----
+  // A lit vertical bridge with the far side of the tip in shadow. Kept narrow
+  // and strictly vertical so it never lines up with the mouth into one bar.
+  const nx = hx + Math.round(hw * 0.44);
+  R(nx, eyeY + eyeH, s, noseY - eyeY - eyeH + s, lit);            // bridge
+  R(nx + s, noseY, s, s, dark);                                   // tip, far side
+
+  // ---- mouth ----
+  // One dark row with the corners dropped, never a solid two-row bar: the bar
+  // plus a lit lower lip under it reads as a moustache at every size.
+  const mw = Math.max(3, Math.round(hw * 0.32));
+  const mx = hx + Math.round((hw - mw) / 2) + (s > 1 ? 1 : 0);
+  R(mx, mouthY, mw, 1, deep);
+  if (look === 'scowl') {                                         // corners pressed down
+    R(mx, mouthY + 1, s, 1, deep);
+    R(mx + mw - s, mouthY + 1, s, 1, deep);
+  } else if (look === 'smirk') {
+    R(mx + mw - s, mouthY - 1, s, 1, deep);                       // one corner lifted
+    R(mx, mouthY + 1, s, 1, deep);
+  }
+}
+
 // ---------- procedural SHADED humanoid (draws facing RIGHT) ----------
 function drawHumanoid(ctx, o) {
   const { w, h, skin, hair, suit, tie, pants = suit, shoe = '#141414', hairStyle = 'short',
-          eye = '#20140a', frame = 0, outfit = 'suit', brow = null } = o;
+          eye = '#20140a', frame = 0, outfit = 'suit', brow = null,
+          look = 'plain', tan = false } = o;
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2;
   const R = (x, y, ww, hh, c) => { ctx.fillStyle = c; ctx.fillRect(Math.round(x), Math.round(y), Math.max(1, Math.round(ww)), Math.max(1, Math.round(hh))); };
 
-  const headW = Math.round(w * 0.50), headH = Math.round(h * 0.26);
+  // 0.30 rather than a realistic 0.26: the extra rows are what let brow, eyes,
+  // nose, mouth and chin each own one, and a chunkier head reads more 16-bit
+  // hero anyway.
+  const headW = Math.round(w * 0.50), headH = Math.round(h * 0.30);
   const headX = Math.round(cx - headW / 2), headY = Math.round(h * 0.10);
   const torsoW = Math.round(w * 0.62), torsoH = Math.round(h * 0.40);
   const torsoX = Math.round(cx - torsoW / 2), torsoY = headY + headH;
@@ -197,42 +301,43 @@ function drawHumanoid(ctx, o) {
     R(cx, torsoY + torsoH * 0.55, 1, 1, shade(suit, 45));           // button glint
   }
 
-  // head (shaded) + face detail
+  // head (shaded), then the face on top
   shbox(ctx, headX, headY, headW, headH, skin);
-  R(headX + headW - 2, headY + 1, 2, headH - 2, shade(skin, -26));   // shaded cheek
-  R(headX + 1, headY + headH * 0.32, 2, 2, shade(skin, 28));         // lit cheek
-  R(headX - 1, headY + headH * 0.44, 1, 3, shade(skin, -14));        // ears
-  R(headX + headW, headY + headH * 0.44, 1, 3, shade(skin, -22));
-  R(headX + headW * 0.26, headY + headH * 0.5, 2, 2, eye);
-  R(headX + headW * 0.60, headY + headH * 0.5, 2, 2, eye);
-  R(headX + headW * 0.34, headY + headH * 0.78, headW * 0.34, 1, shade(skin, -34)); // mouth
-  if (brow) {                                                        // heavy brow reads as a different face entirely
-    R(headX + headW * 0.22, headY + headH * 0.36, headW * 0.22, 1, brow);
-    R(headX + headW * 0.56, headY + headH * 0.36, headW * 0.22, 1, brow);
-  }
+  drawFace(ctx, headX, headY, headW, headH, { skin, eye, brow, look, tan });
 
   // hair (shaded + sheen)
-  if (hairStyle === 'swoop') {          // The Donald: big yellow sweep
-    shbox(ctx, headX - 2, headY - h * 0.055, headW + 3, h * 0.11, hair);
-    R(headX - 2, headY, 2, headH * 0.55, hair);
-    R(headX + headW, headY, 2, headH * 0.30, hair);
-    R(headX, headY - h * 0.028, headW * 0.7, 1, shade(hair, 50));
+  if (hairStyle === 'swoop') {          // The Donald: combed forward, then up and over
+    const hs = headW >= 16 ? 2 : 1;
+    const topH = Math.max(2, Math.round(h * 0.075));
+    const crown = headY - topH;
+    shbox(ctx, headX - hs, crown, headW + hs * 2, topH, hair);
+    R(headX + headW - hs, crown, hs * 2, topH + hs, hair);       // overhangs the brow
+    R(headX + headW + hs, crown + hs, hs, topH, hair);           // the flick past the ear
+    R(headX - hs, crown + topH, hs, headH * 0.5, hair);          // sideburn, back
+    R(headX, headY, headW, 1, shade(hair, -40));                 // shadow the fringe casts
+    R(headX + hs, crown + 1, Math.round(headW * 0.5), 1, shade(hair, 52));   // sheen
+    R(headX + Math.round(headW * 0.22), crown, Math.round(headW * 0.3), 1, shade(hair, -26)); // part
   } else if (hairStyle === 'bowl') {     // The Zuckster: flat fringe, straight across
     shbox(ctx, headX - 2, headY - h * 0.03, headW + 4, h * 0.09, hair);
     R(headX - 2, headY, 2, headH * 0.70, hair);                      // long sides
     R(headX + headW, headY, 2, headH * 0.70, hair);
-    R(headX - 1, headY + headH * 0.26, headW + 2, 2, hair);          // the fringe line
+    // Kept high on the forehead: at 0.26 of a head this tall the fringe lands
+    // straight on the brow and he loses his eyes altogether.
+    R(headX - 1, headY + headH * 0.12, headW + 2, 2, hair);          // the fringe line
+    R(headX - 1, headY + headH * 0.12 + 2, headW + 2, 1, shade(hair, -40)); // fringe shadow
     R(headX, headY - h * 0.012, headW * 0.6, 1, shade(hair, 38));
   } else if (hairStyle === 'wave') {     // ROCKET MAN: swept back with a widow's peak
     shbox(ctx, headX - 1, headY - h * 0.035, headW + 2, h * 0.08, hair);
     R(cx - 1, headY - h * 0.012, 3, 3, hair);                        // peak
     R(headX - 1, headY, 1, headH * 0.42, hair);
     R(headX + headW, headY, 1, headH * 0.34, hair);
+    R(headX, headY, headW, 1, shade(hair, -34));                     // hairline shadow
     R(headX + headW * 0.2, headY - h * 0.02, headW * 0.55, 1, shade(hair, 46));
   } else {                               // short crop / helmet
     shbox(ctx, headX - 1, headY - h * 0.02, headW + 2, h * 0.07, hair);
     R(headX - 1, headY, 1, headH * 0.55, hair);
     R(headX + headW, headY, 1, headH * 0.55, hair);
+    R(headX, headY, headW, 1, shade(hair, -30));                     // hairline shadow
     R(headX, headY - h * 0.004, headW * 0.5, 1, shade(hair, 44));
   }
 
@@ -428,7 +533,11 @@ function makeChar(scene, key, o) {
 class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
   create() {
-    const trump = { w: 20, h: 28, skin: '#e3a86b', hair: '#f4d43a', hairStyle: 'swoop', suit: '#1b2a4a', tie: '#d21f1f', pants: '#22345a' };
+    // Darker skin than the other faces, so the pale ring 'tan' draws around the
+    // eyes has something to sit against. The ring itself only appears on BIG
+    // DONALD — see drawFace, there is no room for it at 10px across.
+    const trump = { w: 20, h: 28, skin: '#d99a58', hair: '#f4d43a', hairStyle: 'swoop', suit: '#1b2a4a', tie: '#d21f1f',
+                    pants: '#22345a', eye: '#2b4a7a', look: 'scowl', tan: true };
     makeChar(this, 'trump0', { ...trump, frame: 0 });
     makeChar(this, 'trump1', { ...trump, frame: 1 });
 
@@ -449,20 +558,20 @@ class BootScene extends Phaser.Scene {
     // Stage 2 boss — THE ZUCKSTER: bowl cut, grey tee, unblinking
     const robo = { w: 44, h: 60, skin: '#e8d4c0', hair: '#7a5a3a', hairStyle: 'bowl', outfit: 'tee',
                    suit: '#8d95a3', tie: '#8d95a3', pants: '#2f3a44',
-                   eye: '#1b3a6b', brow: '#5e432a', shoe: '#e9e9ec' };
+                   eye: '#1b3a6b', brow: '#5e432a', shoe: '#e9e9ec', look: 'plain' };
     makeChar(this, 'robo0', { ...robo, frame: 0 });
     makeChar(this, 'robo1', { ...robo, frame: 1 });
 
     // Stage 3 boss — ROCKET MAN X: black tee, swept hair, smirking
     const rocket = { w: 46, h: 62, skin: '#dcb394', hair: '#2b2118', hairStyle: 'wave', outfit: 'tee',
                      suit: '#1d1f24', tie: '#1d1f24', pants: '#20242c', eye: '#2a2118',
-                     brow: '#1a140e', shoe: '#101216' };
+                     brow: '#1a140e', shoe: '#101216', look: 'smirk' };
     makeChar(this, 'rocket0', { ...rocket, frame: 0 });
     makeChar(this, 'rocket1', { ...rocket, frame: 1 });
 
     // Vault boss — THE GOLDEN IDOL, the gilded statue that guards the money
     const idol = { w: 46, h: 62, skin: '#d9a521', hair: '#ffe27a', hairStyle: 'swoop', suit: '#8c6a14',
-                   tie: '#d21f1f', pants: '#6b500f', eye: '#ffffff', brow: '#7a5810' };
+                   tie: '#d21f1f', pants: '#6b500f', eye: '#b8860f', brow: '#7a5810', look: 'scowl' };
     makeChar(this, 'idol0', { ...idol, frame: 0 });
     makeChar(this, 'idol1', { ...idol, frame: 1 });
 
