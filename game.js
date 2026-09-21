@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 15;
+const BUILD = 16;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -1798,26 +1798,29 @@ class GameScene extends Phaser.Scene {
     const padStart = pad ? !!(pad.buttons[9] && pad.buttons[9].pressed) : false;
     const padKickBtn  = pad ? pad.Y : false;
 
-    // continue / menu (R key or START)
-    this.padStartPrev = padStart;
-    // Anything a player would plausibly try, not just R: on a keyboard the old
-    // prompt read as one key called "R / START" and people sat on the clear
-    // screen not knowing how to go on. CONTINUE_LOCK stops a held jump from
-    // skipping the screen the instant the boss dies.
-    const startEdge = padStart && !this.padStartPrev;
-    const continuePressed = Phaser.Input.Keyboard.JustDown(k.restart)
-      || Phaser.Input.Keyboard.JustDown(k.enter)
-      || Phaser.Input.Keyboard.JustDown(k.jump)
-      || Phaser.Input.Keyboard.JustDown(k.jump2)
-      || startEdge || (padA && !this.padJumpPrev);
+    // ---- key edges, read exactly once ----
+    // Phaser's JustDown() CONSUMES the key's just-pressed flag. Read the same
+    // key twice in one frame and the second reader sees nothing. Letting the
+    // continue screen accept Space silently killed jumping for the whole game,
+    // because the continue check runs first and ate every press. Edges are
+    // computed here, once, and shared.
+    const jumpEdge    = Phaser.Input.Keyboard.JustDown(k.jump) || Phaser.Input.Keyboard.JustDown(k.jump2);
+    const enterEdge   = Phaser.Input.Keyboard.JustDown(k.enter);
+    const restartEdge = Phaser.Input.Keyboard.JustDown(k.restart);
+    const startEdge   = padStart && !this.padStartPrev;
+    const padAEdge    = padA && !this.padJumpPrev;
+    this.padStartPrev = padStart; this.padJumpPrev = padA;
+
+    // continue / menu — Enter, Space, Z, R, pad A or START. CONTINUE_LOCK stops
+    // a held jump from skipping the score screen the instant the boss dies.
+    const continuePressed = restartEdge || enterEdge || jumpEdge || startEdge || padAEdge;
     const canContinue = continuePressed && time > (this.continueAt || 0);
-    if (this.won) { if (canContinue) this.pendingContinue(); this.padJumpPrev = padA; return; }
-    if (this.gameOverFlag) { if (canContinue) this.revive(); this.padJumpPrev = padA; return; }
+    if (this.won) { if (canContinue) this.pendingContinue(); return; }
+    if (this.gameOverFlag) { if (canContinue) this.revive(); return; }
 
     // jump input up-front (also drives the Mega Man-style Down+Jump slide)
-    const jumpJustPressed = Phaser.Input.Keyboard.JustDown(k.jump) || Phaser.Input.Keyboard.JustDown(k.jump2) || (padA && !this.padJumpPrev);
+    const jumpJustPressed = jumpEdge || padAEdge;
     const jumpHeld = k.jump.isDown || k.jump2.isDown || padA;
-    this.padJumpPrev = padA;
 
     // kick edge
     const kickEdge = padKickBtn && !this.padKickPrev; this.padKickPrev = padKickBtn;
