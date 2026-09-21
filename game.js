@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 13;
+const BUILD = 14;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -87,6 +87,20 @@ const WEAPONS = {
 };
 const WEAPON_ORDER = ['machine', 'spread', 'laser'];
 
+// ---------- paratroopers ----------
+// Grunts that come down under a canopy. They exist to give the 8-way aim a
+// reason to exist: everything else in the stage stands on the floor, so up and
+// the diagonals never come up. A drop is announced by the sound, not a banner,
+// so it reads as pressure rather than a cutscene.
+const PARA_FALL = 78;                  // descent speed under the canopy
+const PARA_DRIFT = 20;                 // how far the sway pushes them sideways
+const PARA_AIR_BONUS = 150;            // extra for popping one before it lands
+const PARA_GAP = 300;                  // ms between the troopers of one drop
+
+// How long the stage-clear and game-over screens ignore input. Without it,
+// holding jump as the boss dies skips the score screen before it is read.
+const CONTINUE_LOCK = 700;
+
 // ---------- THE BEAST (rideable carriage) ----------
 const CAR_ARMOR = 8;                   // shells the carriage soaks before it blows
 const CAR_SPEED = 205;                 // faster than on foot (145)
@@ -102,8 +116,12 @@ const LEVELS = [
     theme: 'city', enhanced: false,
     plats: [[380,190,110],[640,158,90],[860,200,80],[1080,165,120],[1320,148,90],
             [1540,195,90],[1780,160,110],[2020,185,100],[2280,150,90],[2540,190,120],[2820,160,100]],
-    grunts: [[500,210],[780,210],[1000,150],[1240,210],[1480,140],[1700,210],
-             [1940,175],[2180,210],[2440,140],[2680,210],[2960,150]],
+    grunts: [[500,210],[640,150],[780,210],[1000,150],[1120,210],[1240,210],
+             [1380,148],[1480,140],[1600,195],[1700,210],[1840,160],[1940,175],
+             [2080,185],[2180,210],[2320,150],[2440,140],[2560,190],[2680,210],
+             [2820,160],[2960,150]],
+    // drops: [x, count] — paratroopers, spawned once the player passes x
+    drops: [[760, 2], [1560, 3], [2400, 3]],
     boss: { key: 'obama', name: 'BARACK O.', hp: 10 },
     carriage: 900,
     pickups: [[620, 200, 'machine'], [1480, 130, 'spread'], [2380, 132, 'laser']],
@@ -119,6 +137,7 @@ const LEVELS = [
     grunts: [[520,210],[720,150],[940,210],[1180,150],[1420,210],[1640,150],
              [1880,175],[2120,210],[2380,140],[2620,210],[2880,150],[3080,210]],
     boss: { key: 'robo', name: 'THE ZUCKSTER', hp: 16 },
+    drops: [[700, 3], [1500, 3], [2200, 4], [2850, 4]],
     carriage: 760,
     pickups: [[520, 200, 'spread'], [1260, 130, 'laser'], [2180, 126, 'machine']],
     secrets: [[880, 214, 'heartc'], [1720, 214, 'heart'], [2560, 128, 'burger']],
@@ -133,6 +152,7 @@ const LEVELS = [
     grunts: [[480,210],[700,150],[900,210],[1120,145],[1360,210],[1580,150],
              [1820,175],[2060,210],[2300,140],[2540,210],[2800,150],[3040,185],[3220,210]],
     boss: { key: 'rocket', name: 'ROCKET MAN X', hp: 22 },
+    drops: [[640, 3], [1300, 4], [1980, 4], [2650, 5]],
     carriage: 620,
     pickups: [[430, 200, 'laser'], [1200, 126, 'machine'], [2360, 170, 'spread'], [2880, 166, 'laser']],
     secrets: [[760, 214, 'heartc'], [1640, 214, 'heart'], [2240, 214, 'burger'], [3000, 126, 'machine']],
@@ -515,6 +535,23 @@ function makePod(scene, key, letter, colorHex) {
   tex.refresh();
 }
 
+function makeChute(scene, key) {
+  const tex = scene.textures.createCanvas(key, 22, 15);
+  const c = tex.context;
+  const R = (x, y, w, h, col) => { c.fillStyle = col; c.fillRect(x, y, w, h); };
+  // canopy: banded, with seams, so it reads as fabric rather than a grey blob
+  R(4, 0, 14, 2, '#d0d0da'); R(2, 2, 18, 2, '#c2c2cc'); R(0, 4, 22, 3, '#b0b0bc');
+  R(4, 0, 14, 1, '#f2f2f6');                                  // lit crown
+  R(0, 6, 22, 1, '#94949f');                                  // shaded hem
+  R(7, 0, 1, 7, '#9a9aa6'); R(14, 0, 1, 7, '#9a9aa6');        // panel seams
+  R(0, 7, 2, 1, '#a8a8b4'); R(20, 7, 2, 1, '#a8a8b4');        // skirt corners
+  // rigging, converging on the harness
+  R(1, 8, 1, 3, '#6f6f7a'); R(20, 8, 1, 3, '#6f6f7a');
+  R(4, 8, 1, 5, '#7a7a86'); R(17, 8, 1, 5, '#7a7a86');
+  R(9, 8, 1, 6, '#6f6f7a'); R(12, 8, 1, 6, '#6f6f7a');
+  tex.refresh();
+}
+
 function makeCarriage(scene, key, frame) {
   const tex = scene.textures.createCanvas(key, CAR_W, CAR_H);
   drawCarriage(tex.context, frame);
@@ -610,6 +647,8 @@ class BootScene extends Phaser.Scene {
     makePod(this, 'pod_machine', 'M', '#ff9e18');
     makePod(this, 'pod_spread',  'S', '#7fffa0');
     makePod(this, 'pod_laser',   'L', '#8fd9ff');
+
+    makeChute(this, 'chute');
 
     // THE BEAST
     makeCarriage(this, 'car0', 0);
@@ -840,6 +879,9 @@ class GameScene extends Phaser.Scene {
     // ---- grunts ----
     this.levelData.grunts.forEach(s => this.spawnGrunt(s[0], s[1]));
 
+    // ---- paratrooper drop zones ----
+    this.drops = (this.levelData.drops || []).map(([x, n]) => ({ x, n, fired: false }));
+
     // ---- weapon pods ----
     this.pods = this.physics.add.group({ allowGravity: false });
     (this.levelData.pickups || []).forEach(([x, y, type]) => {
@@ -897,7 +939,7 @@ class GameScene extends Phaser.Scene {
       left: 'LEFT', right: 'RIGHT', up: 'UP', down: 'DOWN',
       a: 'A', d: 'D', w: 'W', s: 'S',
       jump: 'SPACE', jump2: 'Z', shoot: 'X', shoot2: 'J',
-      kick: 'V', restart: 'R'
+      kick: 'V', restart: 'R', enter: 'ENTER'
     });
 
     // ---- HUD ----
@@ -1104,6 +1146,56 @@ class GameScene extends Phaser.Scene {
     return r;
   }
 
+  // A drop lands a few troopers across the current view. They spawn above the
+  // camera, so they are already falling by the time they are visible.
+  dropParas(n) {
+    for (let i = 0; i < n; i++) {
+      this.time.delayedCall(i * PARA_GAP, () => {
+        if (this.gameOverFlag || this.won || !this.scene.isActive()) return;
+        // Spread around the player as each one jumps, rather than around the
+        // camera when the drop was ordered. The camera lags the player, and
+        // measuring from it put the whole stick down behind him, off screen.
+        // Fan them out on the index: pure random put the whole stick on one
+        // spot often enough to look like a bug.
+        const ahead = Math.random() < 0.7 ? 1 : -1;
+        const spread = 60 + i * 62 + Math.random() * 40;
+        this.dropPara(Phaser.Math.Clamp(this.player.x + ahead * spread, 40, WORLD_W - 40));
+      });
+    }
+    Sound.sfx('warn');
+  }
+
+  dropPara(x) {
+    const g = this.spawnGrunt(x, -18);
+    // World bounds stop at y=0, so a trooper spawned above them would be
+    // clamped into view instead of falling into it. Bounds go back on when it
+    // lands, which is also when gravity takes over from the canopy.
+    g.setCollideWorldBounds(false);
+    g.body.setAllowGravity(false);
+    g.setVelocity(0, PARA_FALL);
+    g.para = true;
+    g.swayPhase = Math.random() * Math.PI * 2;
+    const chute = this.add.sprite(x, -18 - 17, 'chute').setDepth(4);
+    g.chute = chute;
+    // Every kill path destroys the sprite, so hang the canopy cleanup off that
+    // rather than repeating it in each of them.
+    g.once('destroy', () => { if (chute.active) chute.destroy(); });
+  }
+
+  landPara(e) {
+    e.para = false;
+    e.body.setAllowGravity(true);
+    e.setCollideWorldBounds(true);
+    e.setVelocity(0, 0);
+    e.homeX = e.x;
+    const chute = e.chute; e.chute = null;
+    if (chute && chute.active) {
+      this.tweens.add({ targets: chute, alpha: 0, y: chute.y - 8, duration: 420,
+                        onComplete: () => chute.destroy() });
+    }
+    this.spark(e.x, e.y + 8, 0xbfbfd0, 5);
+  }
+
   spawnGrunt(x, y) {
     const g = this.physics.add.sprite(x, y, 'grunt0');
     g.body.setSize(12, 26).setOffset(4, 2);
@@ -1287,6 +1379,15 @@ class GameScene extends Phaser.Scene {
       { fontFamily: 'monospace', fontSize: '12px', color }).setOrigin(0.5).setScrollFactor(0).setDepth(55);
     this._banner = t;
     this.tweens.add({ targets: t, alpha: 0, delay: 1000, duration: 600, onComplete: () => t.destroy() });
+  }
+
+  // A score popup at world coordinates, for a hit worth calling out where it
+  // happened. flashBanner owns the centre of the screen and is too loud for
+  // something that can happen three times in a drop.
+  floatText(x, y, text, color = '#bfe4ff') {
+    const t = this.add.text(x, y, text,
+      { fontFamily: 'monospace', fontSize: '9px', color }).setOrigin(0.5).setDepth(55);
+    this.tweens.add({ targets: t, y: y - 16, alpha: 0, duration: 700, onComplete: () => t.destroy() });
   }
 
   takePod(pod) {
@@ -1494,7 +1595,14 @@ class GameScene extends Phaser.Scene {
     if (e.isBoss) { this.hitBoss(e, dmg); return; }
     e.hp -= dmg; e.setTintFill(0xffffff);
     this.time.delayedCall(60, () => e.active && e.clearTint());
-    if (e.hp <= 0) { this.spark(e.x, e.y, 0xffc14d); e.destroy(); this.score += 100; this.updateHud(); Sound.sfx('explode'); }
+    if (e.hp <= 0) {
+      // Popping one still under its canopy pays extra: that is the shot the
+      // 8-way aim exists for.
+      const air = e.para ? PARA_AIR_BONUS : 0;
+      if (air) this.floatText(e.x, e.y - 10, `+${100 + air}`);
+      this.spark(e.x, e.y, air ? 0xbfe4ff : 0xffc14d, air ? 14 : 8);
+      e.destroy(); this.score += 100 + air; this.updateHud(); Sound.sfx('explode');
+    }
     else Sound.sfx('hit');
   }
 
@@ -1627,6 +1735,7 @@ class GameScene extends Phaser.Scene {
   // ---- end states ----
   win(boss) {
     if (this.won) return; this.won = true;
+    this.continueAt = this.time.now + CONTINUE_LOCK;
     this.spark(boss.x, boss.y, 0xffffff, 30); boss.destroy();
     Sound.stopMusic(); Sound.sfx('explode');
     this.time.delayedCall(700, () => Sound.sfx('clear'));
@@ -1641,7 +1750,7 @@ class GameScene extends Phaser.Scene {
       this.add.text(GAME_W / 2, 148, `SECRETS ${this.secretsFound}/${this.secretsTotal}${all ? '   ALL FOUND!' : ''}`,
         { fontFamily: 'monospace', fontSize: '10px', color: all ? '#88ffaa' : '#9aa4b4' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     }
-    const prompt = last ? 'PRESS R / START TO ENTER THE VAULT' : `PRESS R / START FOR STAGE ${this.level + 1}`;
+    const prompt = last ? 'PRESS ENTER  /  (A) TO ENTER THE VAULT' : `PRESS ENTER  /  (A) FOR STAGE ${this.level + 1}`;
     this.add.text(GAME_W / 2, 174, prompt, { fontFamily: 'monospace', fontSize: '10px', color: '#88ffaa' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     if (last) {
       this.time.addEvent({ delay: 80, repeat: 45, callback: () => this.spark(Phaser.Math.Between(0, GAME_W), 16, Phaser.Display.Color.RandomRGB().color, 3) });
@@ -1654,11 +1763,12 @@ class GameScene extends Phaser.Scene {
 
   gameOver() {
     if (this.gameOverFlag) return; this.gameOverFlag = true;
+    this.continueAt = this.time.now + CONTINUE_LOCK;
     this.player.setTint(0x555555);
     this.physics.pause();
     Sound.stopMusic(); Sound.sfx('gameover');
     const t1 = this.add.text(GAME_W / 2, 110, 'GAME OVER', { fontFamily: 'monospace', fontSize: '24px', color: '#ff3b3b' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
-    const t2 = this.add.text(GAME_W / 2, 146, 'PRESS R / START TO CONTINUE HERE', { fontFamily: 'monospace', fontSize: '9px', color: '#fff' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
+    const t2 = this.add.text(GAME_W / 2, 146, 'PRESS ENTER  /  (A) TO CONTINUE HERE', { fontFamily: 'monospace', fontSize: '9px', color: '#fff' }).setOrigin(0.5).setScrollFactor(0).setDepth(60);
     this.gameOverTexts = [t1, t2];
   }
 
@@ -1689,10 +1799,20 @@ class GameScene extends Phaser.Scene {
     const padKickBtn  = pad ? pad.Y : false;
 
     // continue / menu (R key or START)
-    const startEdge = padStart && !this.padStartPrev; this.padStartPrev = padStart;
-    const continuePressed = Phaser.Input.Keyboard.JustDown(k.restart) || startEdge;
-    if (this.won) { if (continuePressed) this.pendingContinue(); this.padJumpPrev = padA; return; }
-    if (this.gameOverFlag) { if (continuePressed) this.revive(); this.padJumpPrev = padA; return; }
+    this.padStartPrev = padStart;
+    // Anything a player would plausibly try, not just R: on a keyboard the old
+    // prompt read as one key called "R / START" and people sat on the clear
+    // screen not knowing how to go on. CONTINUE_LOCK stops a held jump from
+    // skipping the screen the instant the boss dies.
+    const startEdge = padStart && !this.padStartPrev;
+    const continuePressed = Phaser.Input.Keyboard.JustDown(k.restart)
+      || Phaser.Input.Keyboard.JustDown(k.enter)
+      || Phaser.Input.Keyboard.JustDown(k.jump)
+      || Phaser.Input.Keyboard.JustDown(k.jump2)
+      || startEdge || (padA && !this.padJumpPrev);
+    const canContinue = continuePressed && time > (this.continueAt || 0);
+    if (this.won) { if (canContinue) this.pendingContinue(); this.padJumpPrev = padA; return; }
+    if (this.gameOverFlag) { if (canContinue) this.revive(); this.padJumpPrev = padA; return; }
 
     // jump input up-front (also drives the Mega Man-style Down+Jump slide)
     const jumpJustPressed = Phaser.Input.Keyboard.JustDown(k.jump) || Phaser.Input.Keyboard.JustDown(k.jump2) || (padA && !this.padJumpPrev);
@@ -1854,6 +1974,19 @@ class GameScene extends Phaser.Scene {
     this.enemies.getChildren().forEach(e => {
       if (!e.active) return;
       if (e.isBoss) { this.updateBoss(e, time); return; }
+      if (e.para) {
+        // Hanging: sway, keep the canopy overhead, and hold fire. Being shot at
+        // from above while you are still learning to aim up is not a fair trade.
+        e.setVelocityX(Math.sin(time / 380 + e.swayPhase) * PARA_DRIFT);
+        if (e.chute) {
+          e.chute.x = e.x;
+          e.chute.y = e.y - 17;
+          e.chute.rotation = Math.sin(time / 380 + e.swayPhase) * 0.14;
+        }
+        if (e.body.blocked.down || e.y >= GROUND_TOP - 14) this.landPara(e);
+        e.setFlipX(p.x < e.x);
+        return;
+      }
       const dx = p.x - e.x;
       const range = this.enhanced ? 260 : 230;
       if (Math.abs(dx) < range && Math.abs(p.y - e.y) < 80) {
@@ -1866,6 +1999,13 @@ class GameScene extends Phaser.Scene {
       }
       e.setFlipX(e.dir < 0);
     });
+
+    // paratrooper drops, once each, as the player reaches them
+    if (!this.bossStarted) {
+      for (const d of this.drops) {
+        if (!d.fired && p.x > d.x) { d.fired = true; this.dropParas(d.n); }
+      }
+    }
 
     // trigger boss near the end of the stage
     if (!this.bossStarted && p.x > this.bossTriggerX) this.startBoss();

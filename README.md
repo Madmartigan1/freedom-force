@@ -47,6 +47,7 @@ The title screen has a stage select: **1**-**3** for the side-scrolling stages,
 | Ride    | Up (next to THE BEAST)| Up / D-pad Up   |
 | Eject   | V *or* Down+Jump      | Y *or* Down+A   |
 | Restart | R                     | —               |
+| Continue (stage clear / game over) | Enter / Space / R | A or Start |
 | Mute    | M                     | —               |
 | CRT on/off | C                  | —               |
 | Start   | Enter / Space         | Any button      |
