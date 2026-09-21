@@ -14,6 +14,20 @@ const DOOR_W = 44;                    // door opening, px
 const DUN_SPEED = 130;
 const DUN_FIRE_CD = 190;
 
+// Guards used to walk right into the Donald and stand there. Both are the same
+// build of little pixel man, so the two sprites merged into one unreadable
+// blob and you could not tell what was hitting you. They now hold at arm's
+// length and circle. Walking into that cordon yourself is what throws a punch:
+// the cordon is the enemy's choice, closing it is yours.
+const DUN_STANDOFF = 30;        // closest a guard will willingly come
+const DUN_BOSS_STANDOFF = 42;   // the idol is a much bigger sprite
+const DUN_PUNCH_RANGE = 26;     // inside the cordon, so only you can start it
+const DUN_PUNCH_CD = 380;
+const DUN_PUNCH_DMG = 2;
+const DUN_PUNCH_KNOCK = 240;
+const DUN_PUNCH_GRACE = 150;    // brief i-frames, so a landed punch is not a trade
+const DUN_SEPARATE = 24;        // guards keep off each other as well as off you
+
 // Room grid, row-major. Each room lists which sides have doors.
 // 'lock' marks a door that needs the small key.
 const DUNGEON = {
@@ -50,7 +64,7 @@ class DungeonScene extends Phaser.Scene {
     this.cleared = {};                       // roomIndex -> true once emptied
     this.gameOverFlag = false; this.won = false;
     this.facing = { x: 1, y: 0 };
-    this.nextShot = 0; this.invulnUntil = 0;
+    this.nextShot = 0; this.invulnUntil = 0; this.punchUntil = 0;
     this.transitioning = false;
     this.padShootPrev = false; this.padStartPrev = false;
 
@@ -208,6 +222,7 @@ class DungeonScene extends Phaser.Scene {
       e.body.setSize(12, 16).setOffset(4, 10);
       e.body.setAllowGravity(false);
       e.hp = 3; e.nextShot = 0; e.roomIdx = i;
+      e.orbit = Math.random() < 0.5 ? -1 : 1;
       e.play('grunt-run');
     }
     if (r.key && !this.hasKey) {
@@ -255,6 +270,10 @@ class DungeonScene extends Phaser.Scene {
   hitEnemy(b, e) {
     const dmg = b.dmg || 1;
     this.killBullet(b);
+    this.damageEnemy(e, dmg);
+  }
+
+  damageEnemy(e, dmg) {
     e.hp -= dmg;
     e.setTintFill(0xffffff);
     this.time.delayedCall(60, () => e.active && e.clearTint());
@@ -442,9 +461,33 @@ class DungeonScene extends Phaser.Scene {
       if (!e.active) return;
       if (e.roomIdx !== undefined && e.roomIdx !== ri && !e.isBoss) { e.setVelocity(0, 0); return; }
       const dx = p.x - e.x, dy = p.y - e.y, d = Math.hypot(dx, dy) || 1;
-      const sp = e.isBoss ? 46 : 58;
-      e.setVelocity(dx / d * sp, dy / d * sp);
       e.setFlipX(dx < 0);
+      // A punched guard keeps the velocity the punch gave it; re-steering it
+      // every frame would swallow the knockback entirely.
+      if (e.knockUntil && time < e.knockUntil) return;
+      const sp = e.isBoss ? 46 : 58;
+      const stand = e.isBoss ? DUN_BOSS_STANDOFF : DUN_STANDOFF;
+      if (d > stand) {
+        e.setVelocity(dx / d * sp, dy / d * sp);
+      } else {
+        // orbit at the edge rather than freeze, so a crowded room reads as a
+        // cordon closing in instead of a queue standing still
+        const s2 = sp * 0.6 * (e.orbit || 1);
+        e.setVelocity(-dy / d * s2, dx / d * s2);
+      }
+      // Hold them off each other too. Spacing them from the player alone still
+      // let two guards stack into a single silhouette, which is the same bug
+      // one step removed.
+      if (!e.isBoss) {
+        let sx = 0, sy = 0;
+        for (const o of this.enemies.getChildren()) {
+          if (o === e || !o.active || o.isBoss) continue;
+          const ox = e.x - o.x, oy = e.y - o.y, od = Math.hypot(ox, oy) || 1;
+          if (od < DUN_SEPARATE) { sx += ox / od; sy += oy / od; }
+        }
+        const sl = Math.hypot(sx, sy);
+        if (sl) { e.body.velocity.x += sx / sl * 46; e.body.velocity.y += sy / sl * 46; }
+      }
       if (time > e.nextShot && d < 220) {
         e.nextShot = time + (e.isBoss ? 700 : 1500) + Math.random() * 600;
         const b = this.ebullets.create(e.x, e.y, 'ebullet');
@@ -454,6 +497,41 @@ class DungeonScene extends Phaser.Scene {
       }
     });
 
+    // Reflex punch. Automatic rather than a button: the problem it solves is
+    // being crowded, which is exactly when you can least afford to aim. It only
+    // reaches inside the cordon, so it fires when you close the gap, not when
+    // they do.
+    if (time > this.punchUntil) {
+      for (const e of this.enemies.getChildren()) {
+        if (!e.active) continue;
+        if (e.roomIdx !== undefined && e.roomIdx !== ri && !e.isBoss) continue;
+        const dx = e.x - p.x, dy = e.y - p.y, d = Math.hypot(dx, dy) || 1;
+        if (d > DUN_PUNCH_RANGE) continue;
+        this.punchUntil = time + DUN_PUNCH_CD;
+        this.punch(e, dx / d, dy / d);
+        break;
+      }
+    }
+
     this.checkRoomChange();
+  }
+
+  punch(e, nx, ny) {
+    const p = this.player;
+    p.setFlipX(nx < 0);
+    // the fist: a short bar thrown out along the hit and pulled back
+    const fist = this.add.rectangle(p.x + nx * 9, p.y + ny * 9, 8, 5, 0xffe3b0).setDepth(8);
+    fist.rotation = Math.atan2(ny, nx);
+    this.tweens.add({ targets: fist, x: p.x + nx * 19, y: p.y + ny * 19,
+                      alpha: 0, duration: 130, onComplete: () => fist.destroy() });
+    this.spark(p.x + nx * 17, p.y + ny * 17, 0xffe3b0, 5);
+    Sound.sfx('kick');
+    // Knock first, damage second: if the hit kills it the sprite is gone and
+    // there is nothing left to push.
+    e.knockUntil = this.time.now + 220;
+    e.setVelocity(nx * DUN_PUNCH_KNOCK, ny * DUN_PUNCH_KNOCK);
+    // A landed punch should not also cost a heart to the body you just cleared.
+    this.invulnUntil = Math.max(this.invulnUntil, this.time.now + DUN_PUNCH_GRACE);
+    this.damageEnemy(e, DUN_PUNCH_DMG);
   }
 }

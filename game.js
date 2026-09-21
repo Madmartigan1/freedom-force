@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 14;
+const BUILD = 15;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
