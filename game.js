@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 20;
+const BUILD = 21;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -93,6 +93,11 @@ const WEAPON_ORDER = ['machine', 'spread', 'laser'];
 // their slots sooner. It is also what stops a boss melting in under a second:
 // with no cap, a held machine gun killed ROCKET MAN X in 1.65s, 0.6s if big.
 const SHOT_CAP = { normal: 4, machine: 6, spread: 10, laser: 2, cannon: 2 };
+
+// The laser goes through this many enemies and is spent on the last. It used
+// to pierce everything in the line, drawn as a 20px sliver that undersold it.
+const LASER_PIERCE = 2;
+const LASER_LENGTH = 3.6;              // x-scale of the beam: ~32px, was 2.2 (20px)
 
 // ---------- bosses ----------
 // Contra's bosses do not wander. They run a fixed cycle you can learn: a tell,
@@ -749,7 +754,7 @@ class TitleScene extends Phaser.Scene {
     });
     this.input.keyboard.once('keydown-FOUR', () => {
       Sound.init();
-      this.scene.start('Dungeon', { score: 0, maxHearts: HEARTS_START + 1, weapon: 'spread' });
+      this.scene.start('Dungeon', { score: 0, maxHearts: HEARTS_START + 1 });
     });
 
     this.input.keyboard.on('keydown', () => Sound.init());
@@ -1264,7 +1269,7 @@ class GameScene extends Phaser.Scene {
         this.spawnPlayerBullet(Math.cos(an), Math.sin(an), false, { tint: WEAPONS.spread.tint });
       }
     } else if (w === 'laser') {
-      this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.laser.tint, pierce: true, dmg: 2, speed: 1.9, scaleX: 2.2 });
+      this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.laser.tint, pierce: true, dmg: 2, speed: 1.9, scaleX: LASER_LENGTH });
     } else if (w === 'machine') {
       this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.machine.tint });
     } else {
@@ -1624,11 +1629,13 @@ class GameScene extends Phaser.Scene {
   hitEnemy(b, e) {
     const dmg = b.dmg || 1;
     if (b.pierce) {
-      // A laser passes through; damage each enemy once.
+      // A laser passes through, damaging each enemy once, and is spent on the
+      // LASER_PIERCE-th. Damage below still lands on the one that spends it.
       b.hitList = b.hitList || [];
       if (b.hitList.includes(e)) return;
       b.hitList.push(e);
       this.spark(e.x, e.y, 0x8fd9ff, 4);
+      if (b.hitList.length >= LASER_PIERCE) this.killBullet(b);
     } else {
       this.killBullet(b);
     }
@@ -1897,7 +1904,7 @@ class GameScene extends Phaser.Scene {
     if (last) {
       this.time.addEvent({ delay: 80, repeat: 45, callback: () => this.spark(Phaser.Math.Between(0, GAME_W), 16, Phaser.Display.Color.RandomRGB().color, 3) });
       this.pendingContinue = () => this.scene.start('Dungeon',
-        { score: this.score, maxHearts: this.maxHearts, weapon: this.weapon });
+        { score: this.score, maxHearts: this.maxHearts });          // weapon resets, as every stage's does
     } else {
       this.pendingContinue = () => this.scene.restart({ level: this.level + 1, score: this.score, maxHearts: this.maxHearts });
     }

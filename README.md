@@ -91,7 +91,7 @@ keep it until the stage ends.
 | --- | ------ | --------- |
 | **M** | Machine gun | 75ms cadence — roughly twice the rifle's rate |
 | **S** | Spread | Five-way fan, one damage each |
-| **L** | Laser | Pierces every enemy in the line, two damage |
+| **L** | Laser | A long beam that goes through two enemies, two damage each |
 
 Anything other than the default rifle overrides Stage 2's charge shot. A power-up
 should read as a straight upgrade, not a trade against a mechanic you already have.
@@ -149,8 +149,9 @@ the way A Link to the Past does.
 - **Find the small key**, then stand at the locked door and press **Space / A**
   to open it. The boss chamber is behind it.
 - Rooms hide a heart container, refills and weapon pods.
-- Your hearts, score and weapon carry in from Stage 3. Weapon pods work as they
-  do everywhere else, and the rifle keeps its charge shot.
+- Your hearts and score carry in from Stage 3. You start with the rifle, as in
+  every stage; weapon pods work as they do everywhere else, and the rifle keeps
+  its charge shot.
 
 ## Stages
 

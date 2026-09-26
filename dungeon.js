@@ -55,7 +55,9 @@ class DungeonScene extends Phaser.Scene {
   init(data) {
     this.score = (data && data.score) ? data.score : 0;
     this.maxHearts = (data && data.maxHearts) ? data.maxHearts : HEARTS_START;
-    this.weapon = (data && data.weapon) ? data.weapon : 'normal';
+    // Every stage starts with the rifle; pods are for the stage you find them
+    // in. The Vault used to inherit whatever Stage 3 ended with.
+    this.weapon = 'normal';
   }
 
   create() {
@@ -265,7 +267,7 @@ class DungeonScene extends Phaser.Scene {
       const base = Math.atan2(dy, dx);
       for (let i = -2; i <= 2; i++) this.shootOne(Math.cos(base + i * 0.20), Math.sin(base + i * 0.20), {});
     } else if (w === 'laser') {
-      this.shootOne(dx, dy, { tex: 'cbullet', dmg: 2, pierce: true, speed: 1.6 });
+      this.shootOne(dx, dy, { tex: 'cbullet', dmg: 2, pierce: true, speed: 1.6, scaleX: 2 });
     } else if (charged) {
       this.shootOne(dx, dy, { tex: 'cbullet', dmg: 3, speed: 1.3 });
     } else {
@@ -283,6 +285,7 @@ class DungeonScene extends Phaser.Scene {
     b.setDepth(6);
     b.dmg = o.dmg || 1;
     b.pierce = !!o.pierce;
+    if (o.scaleX) b.setScale(o.scaleX, 1);
     if (this.weapon !== 'normal') b.setTint(WEAPONS[this.weapon].tint);
     this.time.delayedCall(1200, () => b.active && b.destroy());
   }
@@ -294,6 +297,7 @@ class DungeonScene extends Phaser.Scene {
       b.hitList = b.hitList || [];
       if (b.hitList.includes(e)) return;
       b.hitList.push(e);
+      if (b.hitList.length >= LASER_PIERCE) this.killBullet(b);   // spent, as in the stages
     } else {
       this.killBullet(b);
     }
