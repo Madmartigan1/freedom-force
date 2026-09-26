@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 16;
+const BUILD = 17;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -87,6 +87,27 @@ const WEAPONS = {
 };
 const WEAPON_ORDER = ['machine', 'spread', 'laser'];
 
+// Contra limits how many of your shots can be in the air, not how fast you
+// pull the trigger. A faster gun cannot outrun it, and point-blank fire is
+// quicker than firing across the screen because your shots land and free
+// their slots sooner. It is also what stops a boss melting in under a second:
+// with no cap, a held machine gun killed ROCKET MAN X in 1.65s, 0.6s if big.
+const SHOT_CAP = { normal: 4, machine: 6, spread: 10, laser: 2, cannon: 2 };
+
+// ---------- bosses ----------
+// Contra's bosses do not wander. They run a fixed cycle you can learn: a tell,
+// the move, then an opening. They are armoured while the move is underway, so
+// the fight is read-dodge-punish rather than a race to empty the health bar.
+// Each boss's `moves` is matched to the verbs its stage gives you: a ground
+// charge where you can only jump, the leap once you can slide under it.
+const BOSS_IDLE = 650;                 // ms between moves
+const BOSS_TELL = 620;                 // the wind-up you learn to read
+const BOSS_RECOVER = 900;              // the opening after a move, armour off
+const BOSS_VOLLEY_PAUSE = 520;         // standing after a volley, also open
+const BOSS_CHARGE_SPEED = 250;
+const BOSS_LEAP_V = 430;               // launch speed; ~0.95s airborne at 900 g
+const BOSS_SHOCK_SPEED = 190;          // the floor shockwave from a landing
+
 // ---------- paratroopers ----------
 // Grunts that come down under a canopy. They exist to give the 8-way aim a
 // reason to exist: everything else in the stage stands on the floor, so up and
@@ -122,7 +143,7 @@ const LEVELS = [
              [2820,160],[2960,150]],
     // drops: [x, count] — paratroopers, spawned once the player passes x
     drops: [[760, 2], [1560, 3], [2400, 3]],
-    boss: { key: 'obama', name: 'BARACK O.', hp: 10 },
+    boss: { key: 'obama', name: 'BARACK O.', hp: 40, moves: ['volley', 'charge'] },
     carriage: 900,
     pickups: [[620, 200, 'machine'], [1480, 130, 'spread'], [2380, 132, 'laser']],
     // secret: [x, y, reward] — a cracked block hiding something
@@ -136,7 +157,7 @@ const LEVELS = [
             [1460,190,80],[1680,155,100],[1920,180,90],[2160,145,90],[2420,185,110],[2700,155,100],[2980,180,90]],
     grunts: [[520,210],[720,150],[940,210],[1180,150],[1420,210],[1640,150],
              [1880,175],[2120,210],[2380,140],[2620,210],[2880,150],[3080,210]],
-    boss: { key: 'robo', name: 'THE ZUCKSTER', hp: 16 },
+    boss: { key: 'robo', name: 'THE ZUCKSTER', hp: 60, moves: ['volley', 'leap'] },
     drops: [[700, 3], [1500, 3], [2200, 4], [2850, 4]],
     carriage: 760,
     pickups: [[520, 200, 'spread'], [1260, 130, 'laser'], [2180, 126, 'machine']],
@@ -151,7 +172,7 @@ const LEVELS = [
             [2600,150,100],[2860,184,90],[3100,146,100]],
     grunts: [[480,210],[700,150],[900,210],[1120,145],[1360,210],[1580,150],
              [1820,175],[2060,210],[2300,140],[2540,210],[2800,150],[3040,185],[3220,210]],
-    boss: { key: 'rocket', name: 'ROCKET MAN X', hp: 22 },
+    boss: { key: 'rocket', name: 'ROCKET MAN X', hp: 80, moves: ['volley', 'charge', 'volley', 'leap'] },
     drops: [[640, 3], [1300, 4], [1980, 4], [2650, 5]],
     carriage: 620,
     pickups: [[430, 200, 'laser'], [1200, 126, 'machine'], [2360, 170, 'spread'], [2880, 166, 'laser']],
@@ -1235,6 +1256,8 @@ class GameScene extends Phaser.Scene {
     Sound.sfx(WEAPONS[w].sfx);
   }
 
+  shotRoom(kind) { return this.pbullets.countActive(true) < SHOT_CAP[kind]; }
+
   spawnPlayerBullet(ax, ay, charged, opt) {
     const o = opt || {};
     const p = this.player;
@@ -1544,7 +1567,7 @@ class GameScene extends Phaser.Scene {
     // cannon — flat, or angled with up/down
     let ay = 0;
     if (inp.up) ay = -0.55; else if (inp.down && !onGround) ay = 0.55;
-    if (inp.shootHeld && time > this.nextShot) { this.nextShot = time + CAR_FIRE_CD; this.fireCannon(ay); }
+    if (inp.shootHeld && time > this.nextShot && this.shotRoom('cannon')) { this.nextShot = time + CAR_FIRE_CD; this.fireCannon(ay); }
 
     // Eject. Two bindings on purpose: V/Y, and DOWN+JUMP, which is the same
     // shape as the slide and is what people reach for to get out of a vehicle.
@@ -1673,7 +1696,11 @@ class GameScene extends Phaser.Scene {
     boss.body.setSize(bw * 0.62, bh * 0.9).setOffset(bw * 0.19, bh * 0.07);
     boss.setCollideWorldBounds(true).setDepth(5);
     boss.isBoss = true; boss.hp = bcfg.hp; boss.maxHp = bcfg.hp;
-    boss.nextHop = 0; boss.nextShot = 0; boss.phase = 1; boss.tier = this.level;
+    boss.phase = 1; boss.tier = this.level;
+    boss.moves = bcfg.moves || ['volley']; boss.moveIx = 0;
+    boss.state = 'idle'; boss.stateUntil = this.time.now + 900;
+    boss.armoured = false; boss.flashUntil = 0;
+    boss.bw = bw; boss.bh = bh;
     boss.play(bcfg.key + '-run');
     this.boss = boss;
     this.enemies.add(boss);
@@ -1689,11 +1716,17 @@ class GameScene extends Phaser.Scene {
   }
 
   hitBoss(boss, dmg = 1) {
+    if (boss.armoured) {
+      // Mid-move, shots glance off. The opening after the move is where you
+      // score, which is the point of learning the cycle.
+      this.spark(boss.x, boss.y - 10, 0xb8c0cc, 3);
+      return;
+    }
     boss.hp -= dmg; boss.setTintFill(0xffffff);
-    this.time.delayedCall(60, () => boss.active && boss.clearTint());
+    boss.flashUntil = this.time.now + 60;               // bossTint resumes after
     this.spark(boss.x, boss.y - 10, 0xffc14d, 4);
     this.bossBar.scaleX = Math.max(0, boss.hp) / boss.maxHp;
-    if (boss.hp <= boss.maxHp / 2 && boss.phase === 1) { boss.phase = 2; boss.setTint(0xffbbbb); }
+    if (boss.hp <= boss.maxHp / 2 && boss.phase === 1) boss.phase = 2;
     if (boss.hp <= 0) this.win(boss);
   }
 
@@ -1708,28 +1741,120 @@ class GameScene extends Phaser.Scene {
     if (bd.x < this.arenaMinX) { bd.x = this.arenaMinX; if (bd.velocity.x < 0) bd.velocity.x = 0; }
     if (bd.right > this.arenaMaxX) { bd.x = this.arenaMaxX - bd.width; if (bd.velocity.x > 0) bd.velocity.x = 0; }
 
-    boss.setFlipX(p.x < boss.x);
-    const t = boss.tier - 1;  // 0 for stage 1, 1 for stage 2 (harder)
-    if (onFloor) {
-      boss.setVelocityX(bd.velocity.x * 0.85);
-      if (time > boss.nextHop) {
-        boss.nextHop = time + (boss.phase === 2 ? 1100 : 1500) - t * 150;
-        boss.setVelocityX((p.x < boss.x ? -1 : 1) * (60 + t * 20));
-        boss.setVelocityY(-300);
+    const face = p.x < boss.x ? -1 : 1;
+    switch (boss.state) {
+      case 'idle':
+        boss.setFlipX(face < 0);
+        if (onFloor) boss.setVelocityX(face * 22);            // edge in slowly
+        if (time > boss.stateUntil) this.bossNextMove(boss, time);
+        break;
+      case 'tell':
+        boss.setFlipX(face < 0);
+        if (onFloor) boss.setVelocityX(0);
+        if (time > boss.stateUntil) this.bossAct(boss, time);
+        break;
+      case 'charge': {
+        boss.setVelocityX(boss.dir * (BOSS_CHARGE_SPEED + (boss.tier - 1) * 30));
+        const hitWall = boss.dir < 0 ? bd.x <= this.arenaMinX + 1 : bd.right >= this.arenaMaxX - 1;
+        if (hitWall) { this.cameras.main.shake(140, 0.006); this.bossRecover(boss, time); }
+        break;
       }
+      case 'leap':
+        // The launch frame still reads as grounded, hence the grace period.
+        if (onFloor && bd.velocity.y >= 0 && time > boss.stateStart + 150) this.bossLand(boss, time);
+        break;
+      case 'recover':
+        if (onFloor) boss.setVelocityX(0);
+        if (time > boss.stateUntil) { boss.state = 'idle'; boss.stateUntil = time + this.bossTime(boss, BOSS_IDLE); }
+        break;
     }
-    if (time > boss.nextShot) {
-      boss.nextShot = time + (boss.phase === 2 ? 1500 : 2100) - t * 350;
-      const n = (boss.phase === 2 ? 3 : 2) + t;
-      const base = Math.atan2(p.y - boss.y, p.x - boss.x);
-      const spd = ENEMY_BULLET_SPEED * (boss.phase === 2 ? 1.1 : 0.9) * (1 + t * 0.12);
-      for (let i = 0; i < n; i++) {
-        const ang = base + (i - (n - 1) / 2) * 0.26;
-        const eb = this.ebullets.create(boss.x, boss.y - 6, 'ebullet');
-        eb.setVelocity(Math.cos(ang) * spd, Math.sin(ang) * spd); eb.setDepth(6);
-        this.time.delayedCall(3500, () => eb.active && eb.destroy());
-      }
+    this.bossTint(boss, time);
+  }
+
+  // Phase 2 and later bosses run the same cycle, faster.
+  bossTime(boss, ms) {
+    return ms * (boss.phase === 2 ? 0.75 : 1) * (1 - (boss.tier - 1) * 0.08);
+  }
+
+  bossNextMove(boss, time) {
+    const move = boss.moves[boss.moveIx++ % boss.moves.length];
+    if (move === 'volley') {
+      this.bossVolley(boss);
+      boss.state = 'recover'; boss.stateUntil = time + this.bossTime(boss, BOSS_VOLLEY_PAUSE);
+      return;
     }
+    boss.move = move; boss.state = 'tell';
+    boss.stateUntil = time + this.bossTime(boss, BOSS_TELL);
+  }
+
+  bossAct(boss, time) {
+    boss.armoured = true;
+    boss.stateStart = time;
+    const face = this.player.x < boss.x ? -1 : 1;
+    if (boss.move === 'charge') {
+      boss.state = 'charge'; boss.dir = face;
+      // Head down. The shorter body is what makes it jumpable: the Donald's
+      // jump peaks at 62px, and a standing boss body is up to 56px tall.
+      boss.body.setSize(boss.bw * 0.62, boss.bh * 0.55).setOffset(boss.bw * 0.19, boss.bh * 0.42);
+      boss.setAngle(face * 10);
+    } else {
+      boss.state = 'leap';
+      const air = 2 * BOSS_LEAP_V / 900;
+      const tx = Phaser.Math.Clamp(this.player.x, this.arenaMinX + 30, this.arenaMaxX - 30);
+      boss.setVelocity(Phaser.Math.Clamp((tx - boss.x) / air, -260, 260), -BOSS_LEAP_V);
+    }
+  }
+
+  bossLand(boss, time) {
+    this.cameras.main.shake(180, 0.008);
+    // A shockwave runs out both ways along the floor. Jump it, or slide
+    // through it: the slide's i-frames cover exactly this.
+    const t = boss.tier - 1;
+    [-1, 1].forEach(d => {
+      const eb = this.ebullets.create(boss.x + d * 14, GROUND_TOP - 6, 'ebullet');
+      eb.setVelocity(d * (BOSS_SHOCK_SPEED + t * 20), 0).setScale(1.5, 0.8).setDepth(6);
+      this.time.delayedCall(1600, () => eb.active && eb.destroy());
+    });
+    this.bossRecover(boss, time);
+  }
+
+  bossRecover(boss, time) {
+    boss.armoured = false;
+    boss.state = 'recover';
+    boss.stateUntil = time + this.bossTime(boss, BOSS_RECOVER);
+    boss.setAngle(0);
+    // Same bottom edge as the charge body, so the swap does not pop him up.
+    boss.body.setSize(boss.bw * 0.62, boss.bh * 0.9).setOffset(boss.bw * 0.19, boss.bh * 0.07);
+    boss.setVelocityX(0);
+  }
+
+  bossVolley(boss) {
+    const p = this.player, t = boss.tier - 1, hard = boss.phase === 2;
+    const n = (hard ? 3 : 2) + t;
+    const base = Math.atan2(p.y - boss.y, p.x - boss.x);
+    const spd = ENEMY_BULLET_SPEED * (hard ? 1.1 : 0.9) * (1 + t * 0.12);
+    for (let i = 0; i < n; i++) {
+      const ang = base + (i - (n - 1) / 2) * 0.26;
+      const eb = this.ebullets.create(boss.x, boss.y - 6, 'ebullet');
+      eb.setVelocity(Math.cos(ang) * spd, Math.sin(ang) * spd); eb.setDepth(6);
+      this.time.delayedCall(3500, () => eb.active && eb.destroy());
+    }
+  }
+
+  // Tint is state: solid red through the tell, steel blue while armoured,
+  // pink in phase 2. The tell is solid because a flicker only shows on half
+  // the frames, and a tell you can miss is not a tell; it flickers only in
+  // the last instant, as the go signal. Armour is blue rather than grey
+  // because two of these bosses already wear grey. Set every frame so a hit
+  // flash or a kick cannot leave it stale.
+  bossTint(boss, time) {
+    if (time < boss.flashUntil) return;
+    if (boss.state === 'tell') {
+      const last = boss.stateUntil - time < 160;
+      if (last && Math.floor(time / 50) % 2) boss.setTint(0xffffff); else boss.setTint(0xff5050);
+    } else if (boss.armoured) boss.setTint(0x8fb0ff);
+    else if (boss.phase === 2) boss.setTint(0xffbbbb);
+    else boss.clearTint();
   }
 
   // ---- end states ----
@@ -1821,6 +1946,13 @@ class GameScene extends Phaser.Scene {
     // jump input up-front (also drives the Mega Man-style Down+Jump slide)
     const jumpJustPressed = jumpEdge || padAEdge;
     const jumpHeld = k.jump.isDown || k.jump2.isDown || padA;
+
+    // A shot that leaves the screen is gone, as in Contra. Otherwise a missed
+    // burst sits out its 1.4s lifetime holding slots under SHOT_CAP.
+    const camX = this.cameras.main.scrollX;
+    this.pbullets.getChildren().slice().forEach(b => {
+      if (b.active && (b.x < camX - 16 || b.x > camX + GAME_W + 16 || b.y < -16 || b.y > GAME_H + 16)) b.destroy();
+    });
 
     // kick edge
     const kickEdge = padKickBtn && !this.padKickPrev; this.padKickPrev = padKickBtn;
@@ -1928,7 +2060,7 @@ class GameScene extends Phaser.Scene {
       // ----- shoot (Stage 1: rapid fire · Stage 2: hold to charge) -----
       if (this.weapon !== 'normal') {
         // Power-ups are straight rapid fire at their own cadence.
-        if (shootHeld && time > this.nextShot) {
+        if (shootHeld && time > this.nextShot && this.shotRoom(this.weapon)) {
           this.nextShot = time + WEAPONS[this.weapon].cd;
           this.fireWeapon(ax, ay);
         }
@@ -1941,11 +2073,16 @@ class GameScene extends Phaser.Scene {
         } else if (this.chargeStart > 0) {
           const held = time - this.chargeStart; this.chargeStart = 0;
           p.clearTint();
-          this.spawnPlayerBullet(ax, ay, held >= CHARGE_TIME);      // release to fire (charged if held long enough)
-          Sound.sfx(held >= CHARGE_TIME ? 'cannon' : 'shoot');
+          // A full charge always fires: losing one you held for a second to
+          // the cap would feel like a bug. Taps obey the cap like any shot.
+          const full = held >= CHARGE_TIME;
+          if (full || this.shotRoom('normal')) {
+            this.spawnPlayerBullet(ax, ay, full);                  // release to fire (charged if held long enough)
+            Sound.sfx(full ? 'cannon' : 'shoot');
+          }
         }
       } else {
-        if (shootHeld && time > this.nextShot) {
+        if (shootHeld && time > this.nextShot && this.shotRoom('normal')) {
           this.nextShot = time + WEAPONS.normal.cd;
           this.spawnPlayerBullet(ax, ay, false);
           Sound.sfx('shoot');

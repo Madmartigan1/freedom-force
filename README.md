@@ -149,10 +149,27 @@ the way A Link to the Past does.
 
 ## Stages
 
-1. **City** — 8-bit classic styling. Boss: `BARACK O.` (10 HP)
-2. **Neon** — enhanced tech styling, new moves. Boss: `THE ZUCKSTER` (16 HP)
-3. **Marble** — dawn over a gilded capitol. Boss: `ROCKET MAN X` (22 HP)
+1. **City** — 8-bit classic styling. Boss: `BARACK O.` (40 HP) — charges; jump him
+2. **Neon** — enhanced tech styling, new moves. Boss: `THE ZUCKSTER` (60 HP) — leaps; slide under
+3. **Marble** — dawn over a gilded capitol. Boss: `ROCKET MAN X` (80 HP) — both, in turn
 4. **THE VAULT** — top-down dungeon. Boss: `THE GOLDEN IDOL` (20 HP)
+
+### Bosses
+
+The side-scrolling bosses fight the way Contra's do: a fixed cycle you can
+learn rather than a random one. Each move is **telegraphed** — the boss holds
+still and glows red, flashing white just before it goes. **During the move it
+is armoured** (steel blue) and your shots glance off; the **opening** after it,
+and the pause after each volley, is where damage lands. Each boss's move is
+matched to what its stage lets you do: BARACK O.'s charge is low enough to
+jump, THE ZUCKSTER's leap is the reason the slide exists, and its landing sends
+a shockwave along the floor. Below half health they speed up.
+
+As in Contra, there is a **limit on how many of your shots can be in the air**
+at once — 4 for the rifle, 6 machine gun, 10 spread, 2 laser. A faster gun
+cannot outrun it, and firing up close is quicker than firing across the screen,
+because your shots land and free their slots sooner. Shots that leave the
+screen are gone.
 
 ## How it's built
 
