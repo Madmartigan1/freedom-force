@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 21;
+const BUILD = 22;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -98,6 +98,10 @@ const SHOT_CAP = { normal: 4, machine: 6, spread: 10, laser: 2, cannon: 2 };
 // to pierce everything in the line, drawn as a 20px sliver that undersold it.
 const LASER_PIERCE = 2;
 const LASER_LENGTH = 3.6;              // x-scale of the beam: ~32px, was 2.2 (20px)
+// 3, not 2: Stage 2-3 grunts have 3 HP, so at 2 the laser killed nothing in
+// one shot in two thirds of the game. Bosses take it at full strength too --
+// hitBoss reads the damage off the shot, so there is no separate boss rule.
+const LASER_DMG = 3;
 
 // ---------- bosses ----------
 // Contra's bosses do not wander. They run a fixed cycle you can learn: a tell,
@@ -1269,7 +1273,7 @@ class GameScene extends Phaser.Scene {
         this.spawnPlayerBullet(Math.cos(an), Math.sin(an), false, { tint: WEAPONS.spread.tint });
       }
     } else if (w === 'laser') {
-      this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.laser.tint, pierce: true, dmg: 2, speed: 1.9, scaleX: LASER_LENGTH });
+      this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.laser.tint, pierce: true, dmg: LASER_DMG, speed: 1.9, scaleX: LASER_LENGTH });
     } else if (w === 'machine') {
       this.spawnPlayerBullet(ax, ay, false, { tint: WEAPONS.machine.tint });
     } else {

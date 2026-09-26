@@ -267,7 +267,7 @@ class DungeonScene extends Phaser.Scene {
       const base = Math.atan2(dy, dx);
       for (let i = -2; i <= 2; i++) this.shootOne(Math.cos(base + i * 0.20), Math.sin(base + i * 0.20), {});
     } else if (w === 'laser') {
-      this.shootOne(dx, dy, { tex: 'cbullet', dmg: 2, pierce: true, speed: 1.6, scaleX: 2 });
+      this.shootOne(dx, dy, { tex: 'cbullet', dmg: LASER_DMG, pierce: true, speed: 1.6, scaleX: 2 });
     } else if (charged) {
       this.shootOne(dx, dy, { tex: 'cbullet', dmg: 3, speed: 1.3 });
     } else {

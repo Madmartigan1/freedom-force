@@ -91,7 +91,7 @@ keep it until the stage ends.
 | --- | ------ | --------- |
 | **M** | Machine gun | 75ms cadence — roughly twice the rifle's rate |
 | **S** | Spread | Five-way fan, one damage each |
-| **L** | Laser | A long beam that goes through two enemies, two damage each |
+| **L** | Laser | A long beam that goes through two enemies, three damage each — bosses included |
 
 Anything other than the default rifle overrides Stage 2's charge shot. A power-up
 should read as a straight upgrade, not a trade against a mechanic you already have.
