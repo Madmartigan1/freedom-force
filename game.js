@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 18;
+const BUILD = 19;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -930,31 +930,19 @@ class GameScene extends Phaser.Scene {
     (this.levelData.secrets || []).forEach(([sx, sy, reward]) => {
       const b = this.breakables.create(sx, sy, brkKey);
       b.reward = reward;
+      b.hp = 3;
       b.setDepth(3);
       b.refreshBody();
     });
     this.secretsFound = 0;
     this.secretsTotal = (this.levelData.secrets || []).length;
-    // Cracked blocks yield to BIG DONALD and nothing else. Walking into one
-    // while big smashes straight through it; small, it is a wall. Gunfire used
-    // to break them too, which let a stray burst open a secret from across
-    // the screen, before you had ever found it.
-    this.physics.add.collider(this.player, this.breakables, null, (a, b) => {
-      const blk = this.breakables.contains(a) ? a : b;
-      if (!this.big) return true;
-      this.smashBreakable(blk);
-      return false;                                      // no separation: he goes through
-    });
+    this.physics.add.collider(this.player, this.breakables);
     this.physics.add.collider(this.enemies, this.breakables);
     this.physics.add.overlap(this.pbullets, this.breakables, (a, b) => {
       // Group order varies; the bullet is whichever one is not in the static group.
       const blk = this.breakables.contains(a) ? a : b;
       const bul = blk === a ? b : a;
-      // It is still a wall, so shots stop against it -- lasers too -- but it
-      // takes no damage. The dull grey spark says so.
-      if (!bul.active) return;
-      this.spark(bul.x, bul.y, 0x8a8a96, 3);
-      bul.destroy();
+      this.hitBreakable(bul, blk);
     });
 
     // ---- THE BEAST ----
@@ -1295,8 +1283,15 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(3000, () => b.active && b.destroy());
   }
 
-  smashBreakable(blk) {
+  hitBreakable(bullet, blk) {
     if (!blk.active) return;
+    const dmg = bullet.dmg || 1;
+    if (!bullet.pierce) this.killBullet(bullet);
+    blk.hp -= dmg;
+    this.spark(blk.x, blk.y, 0xcccccc, 5);
+    Sound.sfx('hit');
+    if (blk.hp > 0) { blk.setTintFill(0xffffff); this.time.delayedCall(60, () => blk.active && blk.clearTint()); return; }
+
     const reward = blk.reward;
     const rx = blk.x, ry = blk.y;
     blk.destroy();
@@ -1392,7 +1387,8 @@ class GameScene extends Phaser.Scene {
     });
     this.breakables.getChildren().forEach(b => {
       if (b.active && Math.abs(b.x - p.x) < 34 && Math.abs(b.y - p.y) < 40) {
-        this.smashBreakable(b);
+        const bul = { dmg: 3, active: false, pierce: true };            // no bullet to consume
+        this.hitBreakable(bul, b);
       }
     });
     this.cameras.main.shake(180, 0.008);

@@ -77,10 +77,9 @@ ending a life outright.
   across stages**, so searching early makes the later stages survivable.
 - **Heart refills** top you back up.
 - **Cracked blocks** are scattered through every stage. They read as scenery —
-  the hairline crack is the only tell. Gunfire just stops against them: only
-  **BIG DONALD** can break one, by walking into it — he smashes straight
-  through and grabs whatever was inside, a container, a refill or a weapon
-  pod. A few sit on ledges you can only reach from one specific platform.
+  the hairline crack is the only tell. Shoot one three times and it shatters,
+  revealing a container, a refill or a weapon pod. A few sit on ledges you can
+  only reach from one specific platform.
 - The stage-clear screen tallies how many you found.
 
 ## Weapons
@@ -116,7 +115,6 @@ enormous for thirteen seconds.
 - **Nearly twice the size**, and shots hit for 3 instead of 1.
 - **Bodies cannot hurt you.** Getting shot does not cost a heart either — it
   takes time off the clock instead.
-- **Walking into a cracked block smashes through it** — the only way to open one.
 - **Landing hard flattens whatever is underneath**, cracked blocks included,
   and simply walking into a grunt squashes it.
 - He flashes for the last three seconds so it never just runs out on you, and
