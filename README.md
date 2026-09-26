@@ -52,7 +52,8 @@ The title screen has a stage select: **1**-**3** for the side-scrolling stages,
 | CRT on/off | C                  | —               |
 | Start   | Enter / Space         | Any button      |
 
-Hold shoot to build a charge shot. Slide and kick unlock in Stage 2.
+Hold shoot to build a charge shot. Charge, slide and kick unlock in Stage 2, and
+the charge shot stays yours from then on — THE VAULT included.
 
 ## CRT filter
 
@@ -76,9 +77,10 @@ ending a life outright.
   across stages**, so searching early makes the later stages survivable.
 - **Heart refills** top you back up.
 - **Cracked blocks** are scattered through every stage. They read as scenery —
-  the hairline crack is the only tell. Shoot one three times and it shatters,
-  revealing a container, a refill or a weapon pod. A few sit on ledges you can
-  only reach from one specific platform.
+  the hairline crack is the only tell. Gunfire just stops against them: only
+  **BIG DONALD** can break one, by walking into it — he smashes straight
+  through and grabs whatever was inside, a container, a refill or a weapon
+  pod. A few sit on ledges you can only reach from one specific platform.
 - The stage-clear screen tallies how many you found.
 
 ## Weapons
@@ -114,6 +116,7 @@ enormous for thirteen seconds.
 - **Nearly twice the size**, and shots hit for 3 instead of 1.
 - **Bodies cannot hurt you.** Getting shot does not cost a heart either — it
   takes time off the clock instead.
+- **Walking into a cracked block smashes through it** — the only way to open one.
 - **Landing hard flattens whatever is underneath**, cracked blocks included,
   and simply walking into a grunt squashes it.
 - He flashes for the last three seconds so it never just runs out on you, and
@@ -145,7 +148,8 @@ the way A Link to the Past does.
 - **Find the small key**, then stand at the locked door and press **Space / A**
   to open it. The boss chamber is behind it.
 - Rooms hide a heart container, refills and weapon pods.
-- Your hearts, score and weapon carry in from Stage 3.
+- Your hearts, score and weapon carry in from Stage 3. Weapon pods work as they
+  do everywhere else, and the rifle keeps its charge shot.
 
 ## Stages
 

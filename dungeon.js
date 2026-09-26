@@ -64,7 +64,7 @@ class DungeonScene extends Phaser.Scene {
     this.cleared = {};                       // roomIndex -> true once emptied
     this.gameOverFlag = false; this.won = false;
     this.facing = { x: 1, y: 0 };
-    this.nextShot = 0; this.invulnUntil = 0; this.punchUntil = 0;
+    this.nextShot = 0; this.invulnUntil = 0; this.punchUntil = 0; this.chargeStart = 0;
     this.transitioning = false;
     this.padShootPrev = false; this.padStartPrev = false;
 
@@ -254,22 +254,47 @@ class DungeonScene extends Phaser.Scene {
 
   killBullet(b) { if (b && b.active) b.destroy(); }
 
-  fire(dx, dy) {
+  // Each weapon behaves here as it does in the side-scrolling stages. This
+  // used to fire one plain bullet whatever you held: grabbing S set the HUD to
+  // SPREAD and you kept shooting a rifle.
+  fire(dx, dy, charged = false) {
+    const w = this.weapon;
+    if (w === 'spread') {
+      const base = Math.atan2(dy, dx);
+      for (let i = -2; i <= 2; i++) this.shootOne(Math.cos(base + i * 0.20), Math.sin(base + i * 0.20), {});
+    } else if (w === 'laser') {
+      this.shootOne(dx, dy, { tex: 'cbullet', dmg: 2, pierce: true, speed: 1.6 });
+    } else if (charged) {
+      this.shootOne(dx, dy, { tex: 'cbullet', dmg: 3, speed: 1.3 });
+    } else {
+      this.shootOne(dx, dy, {});
+    }
+    Sound.sfx(charged ? 'cannon' : WEAPONS[w].sfx);
+  }
+
+  shootOne(dx, dy, o) {
     const p = this.player;
-    const b = this.pbullets.create(p.x + dx * 10, p.y + dy * 10, this.weapon === 'laser' ? 'cbullet' : 'pbullet');
-    const spd = 380;
+    const b = this.pbullets.create(p.x + dx * 10, p.y + dy * 10, o.tex || 'pbullet');
+    const spd = 380 * (o.speed || 1);
     b.setVelocity(dx * spd, dy * spd);
     b.rotation = Math.atan2(dy, dx);
     b.setDepth(6);
-    b.dmg = this.weapon === 'laser' ? 2 : 1;
+    b.dmg = o.dmg || 1;
+    b.pierce = !!o.pierce;
     if (this.weapon !== 'normal') b.setTint(WEAPONS[this.weapon].tint);
     this.time.delayedCall(1200, () => b.active && b.destroy());
-    Sound.sfx(WEAPONS[this.weapon].sfx);
   }
 
   hitEnemy(b, e) {
     const dmg = b.dmg || 1;
-    this.killBullet(b);
+    if (b.pierce) {
+      // The laser goes through, hitting each enemy once on the way.
+      b.hitList = b.hitList || [];
+      if (b.hitList.includes(e)) return;
+      b.hitList.push(e);
+    } else {
+      this.killBullet(b);
+    }
     this.damageEnemy(e, dmg);
   }
 
@@ -448,8 +473,25 @@ class DungeonScene extends Phaser.Scene {
     } else { p.stop(); p.setTexture('trump0'); }
 
     if (act) this.tryUnlock();
-    if (shoot && time > this.nextShot) {
-      this.nextShot = time + (this.weapon === 'machine' ? 90 : DUN_FIRE_CD);
+    if (this.weapon === 'normal') {
+      // The charge shot you earned in Stage 2 stays yours: the rifle charges
+      // here exactly as it does there. Hold to charge, release to fire.
+      if (shoot) {
+        if (!this.chargeStart) this.chargeStart = time;
+        const full = time - this.chargeStart >= CHARGE_TIME;
+        p.setTint(full ? 0x8fd9ff : 0xffcf9e);
+        if (full && Math.floor(time / 90) % 2 === 0)
+          this.spark(p.x + this.facing.x * 10, p.y + this.facing.y * 10 - 4, 0x8fd9ff, 1);
+      } else if (this.chargeStart) {
+        const full = time - this.chargeStart >= CHARGE_TIME;
+        this.chargeStart = 0;
+        p.clearTint();
+        this.fire(this.facing.x, this.facing.y, full);
+      }
+    } else if (shoot && time > this.nextShot) {
+      // Spread and laser keep their side-scroller cadence; the old flat 190ms
+      // made a five-way fan fire faster here than anywhere else.
+      this.nextShot = time + (this.weapon === 'machine' ? 90 : Math.max(DUN_FIRE_CD, WEAPONS[this.weapon].cd));
       this.fire(this.facing.x, this.facing.y);
     }
 
