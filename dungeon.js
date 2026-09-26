@@ -92,9 +92,11 @@ class DungeonScene extends Phaser.Scene {
     this.physics.add.collider(this.player, this.solids);
     this.physics.add.collider(this.player, this.doorBlocks);
     this.physics.add.collider(this.enemies, this.solids);
-    this.physics.add.collider(this.pbullets, this.solids, b => this.killBullet(b));
-    this.physics.add.collider(this.pbullets, this.doorBlocks, b => this.killBullet(b));
-    this.physics.add.collider(this.ebullets, this.solids, b => this.killBullet(b));
+    // By group, never by argument position: taking the first argument on faith
+    // let a shot destroy the wall, or a LOCKED DOOR, instead of itself.
+    this.physics.add.collider(this.pbullets, this.solids, (a, b) => this.killBullet(this.pbullets.contains(a) ? a : b));
+    this.physics.add.collider(this.pbullets, this.doorBlocks, (a, b) => this.killBullet(this.pbullets.contains(a) ? a : b));
+    this.physics.add.collider(this.ebullets, this.solids, (a, b) => this.killBullet(this.ebullets.contains(a) ? a : b));
     this.physics.add.overlap(this.pbullets, this.enemies, (b, e) => this.hitEnemy(b, e));
     this.physics.add.overlap(this.ebullets, this.player, (pl, b) => { this.killBullet(b); this.damagePlayer(); });
     this.physics.add.overlap(this.enemies, this.player, () => this.damagePlayer());

@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 19;
+const BUILD = 20;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -823,7 +823,7 @@ class GameScene extends Phaser.Scene {
     const theme = this.levelData.theme;
     const neon = theme === 'neon';
     this.solids = this.add.group();
-    this.addSolid(WORLD_W / 2, GROUND_TOP + 18, WORLD_W, 40, neon ? 0x1c1430 : 0x4a3320);
+    this.addSolid(WORLD_W / 2, GROUND_TOP + 18, WORLD_W, 40, neon ? 0x1c1430 : 0x4a3320).kind = 'ground';
     // shaded ground surface drawn over the ground body (lit edge + soil + dither)
     const gsurf = this.add.graphics().setDepth(1);
     gsurf.fillStyle(neon ? 0x3affff : 0x7fae4a, 1).fillRect(0, GROUND_TOP - 1, WORLD_W, 2);
@@ -876,10 +876,15 @@ class GameScene extends Phaser.Scene {
     this.cameras.main.setFollowOffset(-60, 20);
 
     // ---- colliders ----
-    this.physics.add.collider(this.player, this.solids);
+    this.physics.add.collider(this.player, this.solids, null, (a, b) => this.bigPass(a, b, this.solids));
     this.physics.add.collider(this.enemies, this.solids);
-    this.physics.add.collider(this.pbullets, this.solids, b => this.killBullet(b));
-    this.physics.add.collider(this.ebullets, this.solids, b => this.killBullet(b));
+    // Pick the shot by group, never by argument position. Phaser does not
+    // promise the callback arguments arrive in the order the groups were
+    // passed, and killBullet destroys whatever it is handed: taking the first
+    // on faith destroyed the PLATFORM instead of the bullet, so any shot --
+    // yours or a grunt's -- could erase the platform under a pickup.
+    this.physics.add.collider(this.pbullets, this.solids, (a, b) => this.killBullet(this.pbullets.contains(a) ? a : b));
+    this.physics.add.collider(this.ebullets, this.solids, (a, b) => this.killBullet(this.ebullets.contains(a) ? a : b));
     this.physics.add.overlap(this.pbullets, this.enemies, (b, e) => this.hitEnemy(b, e));
     this.physics.add.overlap(this.ebullets, this.player, (pl, b) => { this.killBullet(b); this.damagePlayer(); });
     this.physics.add.overlap(this.enemies, this.player, (a, b) => {
@@ -936,7 +941,7 @@ class GameScene extends Phaser.Scene {
     });
     this.secretsFound = 0;
     this.secretsTotal = (this.levelData.secrets || []).length;
-    this.physics.add.collider(this.player, this.breakables);
+    this.physics.add.collider(this.player, this.breakables, null, (a, b) => this.bigPass(a, b, this.breakables));
     this.physics.add.collider(this.enemies, this.breakables);
     this.physics.add.overlap(this.pbullets, this.breakables, (a, b) => {
       // Group order varies; the bullet is whichever one is not in the static group.
@@ -1159,6 +1164,18 @@ class GameScene extends Phaser.Scene {
   }
 
   // ---- helpers ----
+  // BIG DONALD goes through platforms, ledges and cracked blocks from below and
+  // from the side, but still lands on top of them -- a one-way platform, for
+  // him only. The floor and the boss arena walls stay solid: without them he
+  // would drop out of the world or walk out of a boss fight.
+  bigPass(a, b, grp) {
+    if (!this.big) return true;
+    const obj = grp.contains(a) ? a : b;
+    if (obj.kind === 'ground' || obj.kind === 'wall') return true;
+    const pb = this.player.body;
+    return pb.velocity.y >= 0 && pb.prev.y + pb.height <= obj.body.top + 4;
+  }
+
   addSolid(cx, cy, w, h, color, stroke) {
     const r = this.add.rectangle(cx, cy, w, h, color);
     if (stroke) r.setStrokeStyle(1, stroke);
@@ -1687,8 +1704,8 @@ class GameScene extends Phaser.Scene {
     cam.setScroll(viewL, 0);
     const arenaL = viewL + 16, arenaR = viewL + GAME_W - 16;
     this.arenaMinX = arenaL; this.arenaMaxX = arenaR;
-    this.addSolid(arenaL - 16, GAME_H / 2, 30, GAME_H, 0x2a1a10);
-    this.addSolid(arenaR + 16, GAME_H / 2, 30, GAME_H, 0x2a1a10);
+    this.addSolid(arenaL - 16, GAME_H / 2, 30, GAME_H, 0x2a1a10).kind = 'wall';
+    this.addSolid(arenaR + 16, GAME_H / 2, 30, GAME_H, 0x2a1a10).kind = 'wall';
 
     const bcfg = this.levelData.boss;
     const boss = this.physics.add.sprite(arenaR - 44, 110, bcfg.key + '0');
