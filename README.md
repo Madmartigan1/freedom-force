@@ -6,9 +6,10 @@ of public figures.
 
 **▶ [Play it in your browser](https://madmartigan1.github.io/freedom-force/)**
 
-![Operation: Freedom Force — BIG DONALD in the rain, the boss fights against THE ZUCKSTER and ROCKET MAN X, and a room inside THE VAULT](docs/screenshot.png)
+![Operation: Freedom Force — BIG DONALD in the rain under a paratrooper drop, the boss fights against THE ZUCKSTER and ROCKET MAN X, and a room inside THE VAULT](docs/screenshot.png)
 
-*Clockwise from top left: BIG DONALD in the Stage 2 rain, THE ZUCKSTER, a room
+*Clockwise from top left: BIG DONALD in the Stage 2 rain under a paratrooper
+drop, THE ZUCKSTER, a room
 in THE VAULT, and ROCKET MAN X. Shown with the CRT filter off — press `C` in
 game to turn it on.*
 
