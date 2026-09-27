@@ -8,7 +8,7 @@
 // Bump alongside the ?v= query in index.html whenever the scripts change. It is
 // printed on the title screen so "am I looking at a stale cached build?" is a
 // question you can answer by looking, rather than by guessing.
-const BUILD = 22;
+const BUILD = 23;
 
 const GAME_W = 480, GAME_H = 270;
 const WORLD_W = 3600, GROUND_TOP = 240;
@@ -312,7 +312,7 @@ function drawFace(ctx, hx, hy, hw, hh, o) {
 // ---------- procedural SHADED humanoid (draws facing RIGHT) ----------
 function drawHumanoid(ctx, o) {
   const { w, h, skin, hair, suit, tie, pants = suit, shoe = '#141414', hairStyle = 'short',
-          eye = '#20140a', frame = 0, outfit = 'suit', brow = null,
+          eye = '#20140a', frame = 0, outfit = 'suit', brow = null, armAt = 0.28,
           look = 'plain', tan = false } = o;
   ctx.clearRect(0, 0, w, h);
   const cx = w / 2;
@@ -392,7 +392,7 @@ function drawHumanoid(ctx, o) {
   }
 
   // arm + metallic gun
-  const armY = torsoY + torsoH * 0.28;
+  const armY = torsoY + torsoH * armAt;                // how far down the torso the gun is held
   shbox(ctx, torsoX + torsoW - 2, armY, w * 0.22, torsoH * 0.20, skin);
   shbox(ctx, cx + w * 0.28, armY - 1, w * 0.30, torsoH * 0.26, '#3a3f47');
   R(cx + w * 0.55, armY, w * 0.16, torsoH * 0.12, '#9aa0a8');
@@ -611,8 +611,11 @@ class BootScene extends Phaser.Scene {
     // BIG DONALD is a separately drawn sprite, not a scaled one. Scaling the
     // transform desynced the physics body from the drawn feet and left him
     // hovering; at scale 1 the body maths is the same as every other character.
-    makeChar(this, 'trumpbig0', { ...trump, w: BIG_W, h: BIG_H, frame: 0 });
-    makeChar(this, 'trumpbig1', { ...trump, w: BIG_W, h: BIG_H, frame: 1 });
+    // He holds the gun at the hip. At chest height his shots flew one pixel over
+    // a grunt's head, so he could not shoot them at all; spawnPlayerBullet fires
+    // from this same lowered point, so the shots still leave the gun.
+    makeChar(this, 'trumpbig0', { ...trump, w: BIG_W, h: BIG_H, frame: 0, armAt: 0.52 });
+    makeChar(this, 'trumpbig1', { ...trump, w: BIG_W, h: BIG_H, frame: 1, armAt: 0.52 });
 
     const grunt = { w: 20, h: 28, skin: '#c98a5a', hair: '#2b2b2b', hairStyle: 'short', suit: '#3c4a28', tie: '#3c4a28', pants: '#2e3a20' };
     makeChar(this, 'grunt0', { ...grunt, frame: 0 });
@@ -1287,8 +1290,11 @@ class GameScene extends Phaser.Scene {
   spawnPlayerBullet(ax, ay, charged, opt) {
     const o = opt || {};
     const p = this.player;
-    const mx = p.x + (ax !== 0 ? Math.sign(ax) * 10 : 0);
-    const my = p.y - 4 + (ay > 0 ? 8 : 0) + (ay < 0 ? -2 : 0);
+    // BIG fires from his hip gun (armAt 0.52 on his sprite), further out and
+    // lower than the small sprite's. From chest height, grunt height was
+    // unreachable: his shots crossed at y 205-211, a grunt's body starts at 212.
+    const mx = p.x + (ax !== 0 ? Math.sign(ax) * (this.big ? 18 : 10) : 0);
+    const my = (this.big ? p.y + 8 : p.y - 4) + (ay > 0 ? 8 : 0) + (ay < 0 ? -2 : 0);
     const b = this.pbullets.create(mx, my, charged ? 'cbullet' : 'pbullet');
     const len = Math.hypot(ax, ay) || 1;
     const spd = (charged ? BULLET_SPEED * 1.35 : BULLET_SPEED) * (o.speed || 1);
